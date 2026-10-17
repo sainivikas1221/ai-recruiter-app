@@ -1,0 +1,196 @@
+import type { Preferences } from "@/lib/profile";
+import type { NormalizedJob } from "./types";
+
+export type RankableJob = Omit<NormalizedJob, "postedAt"> & {
+  id: string;
+  postedAt: Date | null;
+  fetchedAt: Date;
+};
+
+export type RankedJob = RankableJob & { score: number; reasons: string[] };
+
+const STOPWORDS = new Set([
+  "and", "or", "of", "the", "a", "an", "for", "to", "in", "with", "at", "on", "i", "ii", "iii",
+  "sr", "jr", "senior", "junior", "lead", "staff", "principal", "head", "remote", "hybrid",
+]);
+
+// Treat common abbreviations and spellings as the same word.
+const SYNONYMS: Record<string, string> = {
+  dev: "developer", developers: "developer", engineers: "engineer", eng: "engineer",
+  swe: "engineer", programmer: "developer", ml: "machine-learning", ai: "machine-learning",
+  frontend: "front-end", backend: "back-end", fullstack: "full-stack", ux: "design",
+  ui: "design", designer: "design", analytics: "analyst", analysis: "analyst", pm: "product",
+  sre: "reliability", devops: "devops", bi: "business-intelligence", qa: "quality",
+};
+
+export function tokens(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/front[\s-]end/g, "frontend")
+    .replace(/back[\s-]end/g, "backend")
+    .replace(/full[\s-]stack/g, "fullstack")
+    .replace(/machine learning/g, "ml")
+    .split(/[^a-z0-9+#.]+/)
+    .map((t) => t.replace(/\.$/, ""))
+    .filter((t) => t && !STOPWORDS.has(t))
+    .map((t) => SYNONYMS[t] ?? t);
+}
+
+/** 0..1: how well a job title matches the best of the user's target roles. */
+export function titleMatch(title: string, roles: string[]): number {
+  const titleTokens = new Set(tokens(title));
+  let best = 0;
+  for (const role of roles) {
+    const roleTokens = [...new Set(tokens(role))];
+    if (!roleTokens.length) continue;
+    const hits = roleTokens.filter((t) => titleTokens.has(t)).length;
+    best = Math.max(best, hits / roleTokens.length);
+  }
+  return best;
+}
+
+function mentionsSkill(haystack: string, skill: string) {
+  const s = skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${s}(?![a-z0-9])`).test(haystack);
+}
+
+function normalizePlace(s: string) {
+  return s.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const EMPLOYMENT_ALIASES: Record<string, string[]> = {
+  full_time: ["full", "permanent", "fulltime", "full_time", "full-time"],
+  part_time: ["part", "parttime", "part_time", "part-time"],
+  contract: ["contract", "contractor", "freelance"],
+  internship: ["intern"],
+  temporary: ["temp"],
+};
+
+function employmentMatches(employmentType: string | null, wanted: string[]): boolean | null {
+  if (!employmentType || !wanted.length) return null;
+  const e = employmentType.toLowerCase();
+  const known = Object.values(EMPLOYMENT_ALIASES).some((aliases) => aliases.some((a) => e.includes(a)));
+  if (!known) return null;
+  return wanted.some((w) => (EMPLOYMENT_ALIASES[w] ?? [w]).some((a) => e.includes(a)));
+}
+
+function formatMoney(n: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+      notation: "compact",
+      maximumFractionDigits: 0,
+    }).format(n);
+  } catch {
+    return `${currency} ${n}`;
+  }
+}
+
+/**
+ * Scores one job from 0 to 100 against the user's preferences and explains the score.
+ * Weights: title 45, skills 25, location and work mode 15, salary 10, recency 5.
+ * Returns null when the job is clearly not a fit (wrong role, wrong place, wrong type).
+ */
+export function scoreJob(
+  job: RankableJob,
+  prefs: Preferences,
+  now = new Date(),
+): { score: number; reasons: string[] } | null {
+  const reasons: string[] = [];
+
+  const title = titleMatch(job.title, prefs.roles);
+  if (prefs.roles.length && title < 0.5) return null;
+  if (title >= 0.99) reasons.push("Title matches your target role");
+  else if (title > 0) reasons.push("Title is close to your target role");
+
+  const haystack = `${job.title}\n${job.description ?? ""}`.toLowerCase();
+  const matchedSkills = prefs.skills.filter((s) => mentionsSkill(haystack, s));
+  const skillScore = prefs.skills.length
+    ? Math.min(1, matchedSkills.length / Math.min(6, prefs.skills.length))
+    : 0.5;
+  if (matchedSkills.length) reasons.push(`Mentions ${matchedSkills.slice(0, 4).join(", ")}`);
+
+  // Location and work mode.
+  const wantsRemote = prefs.workModes.includes("remote");
+  const wantsInPerson = prefs.workModes.includes("hybrid") || prefs.workModes.includes("onsite");
+  const place = normalizePlace(job.location ?? "");
+  const inWantedPlace =
+    !!place && prefs.locations.some((l) => normalizePlace(l) && place.includes(normalizePlace(l)));
+  let placeScore: number;
+  if (job.workMode === "remote") {
+    if (!wantsRemote && !inWantedPlace) return null;
+    placeScore = wantsRemote ? 1 : 0.6;
+    if (wantsRemote) reasons.push("Remote");
+  } else if (inWantedPlace) {
+    if (job.workMode && !prefs.workModes.includes(job.workMode) && !wantsInPerson) return null;
+    placeScore = 1;
+    reasons.push(`In ${job.location}`);
+  } else if (prefs.locations.length && job.workMode) {
+    // An office job somewhere the user hasn't said they want to work.
+    return null;
+  } else {
+    placeScore = 0.4;
+  }
+
+  const employment = employmentMatches(job.employmentType, prefs.jobTypes);
+  if (employment === false) return null;
+
+  // Salary: neutral when either side is unknown or currencies differ.
+  let salaryScore = 0.5;
+  if (
+    prefs.salaryMin &&
+    prefs.salaryCurrency &&
+    job.salaryCurrency === prefs.salaryCurrency &&
+    (job.salaryMax || job.salaryMin)
+  ) {
+    const top = (job.salaryMax ?? job.salaryMin)!;
+    const target = prefs.salaryTarget ?? prefs.salaryMin;
+    if (top >= target) {
+      salaryScore = 1;
+      reasons.push(`Pays up to ${formatMoney(top, job.salaryCurrency)}`);
+    } else if (top >= prefs.salaryMin) {
+      salaryScore = 0.75;
+      reasons.push(`Pays up to ${formatMoney(top, job.salaryCurrency)}`);
+    } else {
+      salaryScore = Math.max(0, top / prefs.salaryMin - 0.5);
+      reasons.push(`Pays below your minimum`);
+    }
+  }
+
+  const posted = job.postedAt ?? job.fetchedAt;
+  const ageDays = (now.getTime() - posted.getTime()) / 86_400_000;
+  const recency = ageDays <= 7 ? 1 : ageDays <= 21 ? 0.6 : 0.2;
+  if (ageDays <= 3) reasons.push("Posted in the last 3 days");
+
+  const titleWeight = prefs.roles.length ? 45 * title : 20;
+  const score =
+    titleWeight + 25 * skillScore + 15 * placeScore + 10 * salaryScore + 5 * recency;
+  return { score: Math.round(Math.min(100, score)), reasons };
+}
+
+/** Ranks jobs best first and drops near-duplicate listings of the same role. */
+export function rankJobs(jobs: RankableJob[], prefs: Preferences, now = new Date()): RankedJob[] {
+  const scored: RankedJob[] = [];
+  for (const job of jobs) {
+    const result = scoreJob(job, prefs, now);
+    if (result) scored.push({ ...job, ...result });
+  }
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (b.postedAt ?? b.fetchedAt).getTime() - (a.postedAt ?? a.fetchedAt).getTime(),
+  );
+
+  // The same role often appears on the company board and on aggregators.
+  // Keep the first (best-scoring) copy, preferring the company's own board on ties.
+  const seen = new Map<string, RankedJob>();
+  for (const job of scored) {
+    const key = `${job.company.toLowerCase().trim()}|${tokens(job.title).join(" ")}|${normalizePlace(job.location ?? "")}`;
+    const existing = seen.get(key);
+    if (!existing || (job.score === existing.score && job.applyViaAts && !existing.applyViaAts)) {
+      seen.set(key, job);
+    }
+  }
+  return [...seen.values()].sort((a, b) => b.score - a.score);
+}

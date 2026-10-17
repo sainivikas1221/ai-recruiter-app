@@ -1,0 +1,35 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { signIn } from "@/app/actions/auth";
+import { AuthForm } from "@/components/auth-form";
+import { GoogleButton } from "@/components/google-button";
+import { getCurrentUser } from "@/lib/auth/user";
+
+const ERRORS: Record<string, string> = {
+  google: "Google sign-in didn't complete. Please try again.",
+  "google-email": "Your Google account needs a verified email address.",
+};
+
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  if (await getCurrentUser()) redirect("/jobs");
+  const { error } = await searchParams;
+  return (
+    <div className="mx-auto flex max-w-sm flex-col gap-6">
+      <h1 className="text-2xl font-bold">Sign in</h1>
+      <div className="card flex flex-col gap-4">
+        <GoogleButton />
+        <AuthForm
+          mode="signin"
+          action={signIn}
+          initialError={typeof error === "string" ? ERRORS[error] : undefined}
+        />
+      </div>
+      <p className="text-sm text-muted">
+        New here?{" "}
+        <Link href="/signup" className="text-accent hover:underline">
+          Start your free trial
+        </Link>
+      </p>
+    </div>
+  );
+}
