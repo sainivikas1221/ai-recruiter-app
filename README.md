@@ -49,6 +49,15 @@ set `DATABASE_URL` in `.env.local`. Tables are created automatically when the se
 next to the built-in database. Without `ANTHROPIC_API_KEY` the app reads resumes with a simple
 keyword matcher.
 
+## Hosting online (Hostinger)
+
+Hostinger's **Business** and **Cloud** web hosting plans run Next.js apps (hPanel → Websites →
+Add website → Node.js web app). Upload `JobPilot-hostinger.zip` (or connect this repository), keep
+the detected Next.js settings (Node 22, `npm run build`, output `.next`) and set one environment
+variable: `DATABASE_URL`, a Postgres connection string such as a free [Neon](https://neon.tech)
+database. Hostinger has no Postgres of its own on these plans. The tables are created when the app
+starts. Add `ANTHROPIC_API_KEY` to have Claude read resumes.
+
 ```bash
 npm test          # unit tests
 npm run lint
