@@ -44,6 +44,7 @@ export async function uploadResume(_prev: UploadState, formData: FormData): Prom
     mimeType: resumeKind(file) === "pdf" ? "application/pdf" : file.type || "application/octet-stream",
     sizeBytes: file.size,
     text,
+    file: new Uint8Array(await file.arrayBuffer()),
     extracted: extraction.profile,
     extractedBy: extraction.by,
   });

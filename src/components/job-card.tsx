@@ -1,4 +1,6 @@
+import { markApplied } from "@/app/actions/apply";
 import type { RankedJob } from "@/lib/jobs/rank";
+import { STATUS_LABELS, type ApplicationSummary } from "@/lib/apply/labels";
 
 const SOURCE_LABELS: Record<string, string> = {
   greenhouse: "Greenhouse",
@@ -36,7 +38,18 @@ function age(date: Date) {
   return `${days} days ago`;
 }
 
-export function JobCard({ job }: { job: RankedJob }) {
+/** Rendered inside the jobs page's selection form; buttons post their own actions. */
+export function JobCard({
+  job,
+  selectable,
+  autoApply,
+  application,
+}: {
+  job: RankedJob;
+  selectable: boolean;
+  autoApply: boolean;
+  application: ApplicationSummary | null;
+}) {
   const remote = job.workMode === "remote";
   const place = remote
     ? job.location && !/^remote$/i.test(job.location.trim())
@@ -56,6 +69,16 @@ export function JobCard({ job }: { job: RankedJob }) {
   const posted = job.postedAt ?? null;
   return (
     <li className="card flex gap-4 p-4">
+      {selectable && (
+        <input
+          type="checkbox"
+          name="job"
+          value={job.id}
+          aria-label={`Select ${job.title} at ${job.company}`}
+          disabled={application?.status === "applied" || application?.status === "submitted"}
+          className="mt-1 size-5 shrink-0 accent-[var(--accent)]"
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <a href={job.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">
           {job.title}
@@ -73,7 +96,13 @@ export function JobCard({ job }: { job: RankedJob }) {
         <p className="mt-1 text-xs text-muted">
           via {SOURCE_LABELS[job.source] ?? job.source}
           {posted && ` · posted ${age(posted)}`}
+          {autoApply && !application && " · JobPilot can apply for you"}
         </p>
+        {application && (
+          <p className="mt-1 text-xs font-medium text-accent">
+            {STATUS_LABELS[application.status]} · {application.appliedBy === "user" ? "by you" : "by JobPilot"}
+          </p>
+        )}
       </div>
       <div className="flex flex-col items-end justify-between gap-2">
         <span
@@ -85,6 +114,15 @@ export function JobCard({ job }: { job: RankedJob }) {
         <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-1 text-sm whitespace-nowrap">
           View job
         </a>
+        {!application && (
+          <button
+            formAction={markApplied.bind(null, job.id)}
+            className="text-xs text-muted hover:underline"
+            title="Add this job to your applications"
+          >
+            I applied
+          </button>
+        )}
       </div>
     </li>
   );

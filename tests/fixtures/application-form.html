@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<body>
+<form id="application" onsubmit="event.preventDefault(); document.body.innerHTML = '<h1>Thank you for applying!</h1>';">
+  <div><label for="first_name">First Name *</label><input id="first_name" name="first_name" required></div>
+  <div><label for="last_name">Last Name *</label><input id="last_name" name="last_name" required></div>
+  <div><label for="email">Email *</label><input id="email" type="email" required></div>
+  <div><label for="phone">Phone</label><input id="phone" type="tel"></div>
+  <div><label for="resume">Resume/CV *</label><input id="resume" type="file" required></div>
+  <div><label for="q1">LinkedIn Profile</label><input id="q1"></div>
+  <div>
+    <label for="q2">Are you legally authorized to work in India? *</label>
+    <select id="q2" required><option value="">Select...</option><option>Yes</option><option>No</option></select>
+  </div>
+  <fieldset>
+    <legend>Will you now or in the future require visa sponsorship? *</legend>
+    <label><input type="radio" name="sponsor" value="1" required> Yes</label>
+    <label><input type="radio" name="sponsor" value="0"> No</label>
+  </fieldset>
+  <div>
+    <label for="eeo">Gender</label>
+    <select id="eeo"><option value="">Select...</option><option>Decline to self-identify</option></select>
+  </div>
+  <div><label><input type="checkbox" id="consent" required> I agree to the privacy notice *</label></div>
+  <!--EXTRA-->
+  <button type="submit">Submit application</button>
+</form>
+</body>
+</html>

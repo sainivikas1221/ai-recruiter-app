@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   integer,
   jsonb,
   pgTable,
@@ -7,8 +8,13 @@ import {
   timestamp,
   uuid,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { ExtractedProfile } from "@/lib/profile";
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+});
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -33,8 +39,9 @@ export const resumes = pgTable(
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    // Only the extracted text is kept; the original file is not stored.
     text: text("text").notNull(),
+    // The original file, attached to applications the user asks JobPilot to send.
+    file: bytea("file"),
     // What the AI pulled out of the resume, before the user edits anything.
     extracted: jsonb("extracted").$type<ExtractedProfile>(),
     extractedBy: text("extracted_by").$type<"claude" | "heuristic">(),
@@ -92,3 +99,59 @@ export const sourceRuns = pgTable("source_runs", {
   jobCount: integer("job_count").notNull().default(0),
   error: text("error"),
 });
+
+/** What application forms ask for beyond the resume. Filled once, reused for every application. */
+export const applicantDetails = pgTable("applicant_details", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  phone: text("phone"),
+  city: text("city"),
+  linkedinUrl: text("linkedin_url"),
+  websiteUrl: text("website_url"),
+  currentCompany: text("current_company"),
+  // null = not answered, so forms asking this are left for the user.
+  authorizedToWork: boolean("authorized_to_work"),
+  needsSponsorship: boolean("needs_sponsorship"),
+  noticePeriod: text("notice_period"),
+  coverNote: text("cover_note"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const APPLICATION_STATUSES = [
+  "queued", // waiting for JobPilot to fill the form
+  "filling",
+  "ready", // test mode: form filled, not sent
+  "submitted",
+  "needs_you", // a CAPTCHA, a question we can't answer, or a form we don't understand
+  "failed",
+  "applied", // the user applied themselves
+] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+export const applications = pgTable(
+  "applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jobId: text("job_id").notNull(),
+    // A copy of the posting, so the record survives the job being taken down.
+    company: text("company").notNull(),
+    title: text("title").notNull(),
+    url: text("url").notNull(),
+    source: text("source").notNull(),
+    appliedBy: text("applied_by").$type<"jobpilot" | "user">().notNull(),
+    status: text("status").$type<ApplicationStatus>().notNull(),
+    // Plain-language explanation of the status, e.g. which question needs an answer.
+    note: text("note"),
+    // What the filled form looked like, for the user to check.
+    screenshot: bytea("screenshot"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("applications_user_job_idx").on(t.userId, t.jobId), index("applications_status_idx").on(t.status)],
+);

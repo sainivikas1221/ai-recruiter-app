@@ -29,6 +29,9 @@ async function Nav() {
       <Link href="/jobs" className="hover:underline">
         Jobs
       </Link>
+      <Link href="/applications" className="hover:underline">
+        Applications
+      </Link>
       <Link href="/preferences" className="hover:underline">
         Preferences
       </Link>

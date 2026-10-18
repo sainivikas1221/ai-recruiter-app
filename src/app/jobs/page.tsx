@@ -3,6 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { refreshJobs } from "@/app/actions/jobs";
 import { JobCard } from "@/components/job-card";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { canAutoApply } from "@/lib/apply/eligibility";
+import type { ApplicationSummary } from "@/lib/apply/labels";
 import { requireUser } from "@/lib/auth/user";
 import { searchJobs } from "@/lib/jobs/search";
 import { getPreferences } from "@/lib/preferences";
@@ -10,13 +14,14 @@ import type { Preferences } from "@/lib/profile";
 
 const PAGE_SIZE = 50;
 
-type Filters = { remoteOnly: boolean; localOnly: boolean; minScore: number; limit: number };
+type Filters = { remoteOnly: boolean; localOnly: boolean; autoOnly: boolean; minScore: number; limit: number };
 
 function filtersFrom(params: Record<string, string | string[] | undefined>): Filters {
   const num = (v: unknown, d: number) => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : d);
   return {
     remoteOnly: params.remote === "1",
     localOnly: params.near === "1",
+    autoOnly: params.auto === "1",
     minScore: Math.min(100, num(params.min, 0)),
     limit: Math.min(500, num(params.limit, PAGE_SIZE)),
   };
@@ -27,20 +32,29 @@ function href(f: Filters, change: Partial<Filters>) {
   const q = new URLSearchParams();
   if (next.remoteOnly) q.set("remote", "1");
   if (next.localOnly) q.set("near", "1");
+  if (next.autoOnly) q.set("auto", "1");
   if (next.minScore) q.set("min", String(next.minScore));
   if (next.limit !== PAGE_SIZE) q.set("limit", String(next.limit));
   const s = q.toString();
   return s ? `/jobs?${s}` : "/jobs";
 }
 
-async function Results({ prefs, filters }: { prefs: Preferences; filters: Filters }) {
-  const { jobs, feedResults } = await searchJobs(prefs);
+async function Results({ userId, prefs, filters }: { userId: string; prefs: Preferences; filters: Filters }) {
+  const [{ jobs, feedResults }, applied] = await Promise.all([
+    searchJobs(prefs),
+    db
+      .select({ jobId: schema.applications.jobId, status: schema.applications.status, appliedBy: schema.applications.appliedBy })
+      .from(schema.applications)
+      .where(and(eq(schema.applications.userId, userId))),
+  ]);
+  const applications = new Map<string, ApplicationSummary>(applied.map((a) => [a.jobId, a]));
   const failed = feedResults.filter((f) => !f.ok);
   const shown = jobs.filter(
     (j) =>
       j.score >= filters.minScore &&
       (!filters.remoteOnly || j.workMode === "remote") &&
-      (!filters.localOnly || j.local),
+      (!filters.localOnly || j.local) &&
+      (!filters.autoOnly || canAutoApply(j)),
   );
 
   return (
@@ -51,6 +65,12 @@ async function Results({ prefs, filters }: { prefs: Preferences; filters: Filter
           <span className="font-normal text-muted"> · best match first</span>
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
+          <Link
+            href={href(filters, { autoOnly: !filters.autoOnly, limit: PAGE_SIZE })}
+            className={`chip ${filters.autoOnly ? "border-accent bg-accent-soft" : ""}`}
+          >
+            JobPilot can apply
+          </Link>
           {prefs.locations.length > 0 && (
             <Link
               href={href(filters, { localOnly: !filters.localOnly, limit: PAGE_SIZE })}
@@ -91,11 +111,26 @@ async function Results({ prefs, filters }: { prefs: Preferences; filters: Filter
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {shown.slice(0, filters.limit).map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </ul>
+        // One form for the list: ticked jobs go to the review page; card buttons post their own actions.
+        <form action="/apply/review" className="flex flex-col gap-3">
+          {filters.autoOnly && (
+            <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
+              <span>Tick the jobs you want JobPilot to apply to. You&apos;ll check everything before anything is sent.</span>
+              <button className="btn py-1.5">Review selected jobs</button>
+            </div>
+          )}
+          <ul className="flex flex-col gap-3">
+            {shown.slice(0, filters.limit).map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                selectable={filters.autoOnly}
+                autoApply={canAutoApply(job)}
+                application={applications.get(job.id) ?? null}
+              />
+            ))}
+          </ul>
+        </form>
       )}
       {shown.length > filters.limit && (
         <Link href={href(filters, { limit: filters.limit + PAGE_SIZE })} className="btn-ghost self-center">
@@ -134,7 +169,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
           </div>
         }
       >
-        <Results prefs={prefs} filters={filters} />
+        <Results userId={user.id} prefs={prefs} filters={filters} />
       </Suspense>
     </div>
   );

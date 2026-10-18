@@ -31,5 +31,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+        env:
+          # GitHub's Ubuntu runners come with Chrome; used by the form-filling tests.
+          AUTO_APPLY_BROWSER: /usr/bin/google-chrome
       - run: npm run db:migrate
       - run: npm run build

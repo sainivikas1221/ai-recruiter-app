@@ -79,8 +79,8 @@ export default async function OnboardingPage({ searchParams }: PageProps<"/onboa
         .
       </p>
       <p className="text-xs text-muted">
-        We keep the text of your resume to match you with jobs, not the file itself. You can delete
-        your account and data at any time.
+        We keep your resume to match you with jobs and to attach it to applications you ask us to send.
+        You can delete your account and data at any time.
       </p>
     </div>
   );

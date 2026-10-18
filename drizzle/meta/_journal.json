@@ -15,6 +15,13 @@
       "when": 1792322358724,
       "tag": "0001_ancient_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792334677186,
+      "tag": "0002_silly_butterfly",
+      "breakpoints": true
     }
   ]
 }
