@@ -30,18 +30,24 @@ and the same role listed on two sources is shown once.
 
 ## Running locally
 
+**The easy way:** double-click `Start JobPilot.bat` (Windows) or `Start JobPilot.command` (Mac).
+It installs Node.js if needed (Windows), downloads dependencies and builds the app the first time,
+then opens it in your browser. Nothing else to set up: without `DATABASE_URL` the app runs Postgres
+inside itself ([PGlite](https://pglite.dev)) and keeps the data in `~/.jobpilot`, so a fresh download
+keeps your accounts. The first start asks once for an optional Anthropic API key.
+
+**As a developer:**
+
 ```bash
 npm install
-npm run setup     # asks for a Postgres connection string, writes .env.local, creates the tables
-npm run dev       # http://localhost:3000
+npm run dev       # http://localhost:3000, built-in database
 ```
 
-Any Postgres works: a free hosted one (for example Neon), or `docker compose up -d` for one on
-localhost:5432 (`postgres://app:app@localhost:5432/recruiter`). To fill `.env.local` by hand
-instead, copy `.env.example` and run `npm run db:migrate`.
-
-Without `ANTHROPIC_API_KEY` the app reads resumes with a simple keyword matcher, so the whole flow
-works offline. With a key, Claude does the extraction.
+To use a real Postgres instead (any provider, or `docker compose up -d`), run `npm run setup` once, or
+set `DATABASE_URL` in `.env.local`. Tables are created automatically when the server starts.
+`SESSION_SECRET` is optional: without it the app derives one from `DATABASE_URL`, or generates one
+next to the built-in database. Without `ANTHROPIC_API_KEY` the app reads resumes with a simple
+keyword matcher.
 
 ```bash
 npm test          # unit tests
