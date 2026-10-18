@@ -6,8 +6,9 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/lib/auth/user";
 import { extractProfile } from "@/lib/ai/extract";
+import { isLinkedInExport } from "@/lib/ai/heuristic";
 import { preferencesFromProfile } from "@/lib/profile";
-import { savePreferences } from "@/lib/preferences";
+import { getLatestDocuments, savePreferences } from "@/lib/preferences";
 import { extractResumeText, ResumeParseError, resumeKind } from "@/lib/resume/parse";
 
 export type UploadState = { error?: string } | undefined;
@@ -25,9 +26,13 @@ export async function uploadResume(_prev: UploadState, formData: FormData): Prom
     throw err;
   }
 
+  // A resume and a LinkedIn profile describe the same person, so read them together.
+  const earlier = await getLatestDocuments(user.id);
+  const other = isLinkedInExport(text) ? earlier.resume : earlier.linkedin;
+
   let extraction;
   try {
-    extraction = await extractProfile(text, { name: user.name });
+    extraction = await extractProfile(other ? [text, other] : [text], { name: user.name });
   } catch (err) {
     console.error("Resume extraction failed", err);
     return { error: "Our AI couldn't read your resume just now. Please try again in a minute." };

@@ -1,6 +1,7 @@
 import "server-only";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { isLinkedInExport } from "@/lib/ai/heuristic";
 import type { JobType, Preferences, WorkMode } from "@/lib/profile";
 
 export async function getPreferences(userId: string): Promise<Preferences | null> {
@@ -41,4 +42,18 @@ export async function getLatestResume(userId: string) {
     .orderBy(desc(schema.resumes.createdAt))
     .limit(1);
   return row ?? null;
+}
+
+/** The newest resume and the newest LinkedIn profile export the user uploaded, if any. */
+export async function getLatestDocuments(userId: string) {
+  const rows = await db
+    .select({ text: schema.resumes.text })
+    .from(schema.resumes)
+    .where(eq(schema.resumes.userId, userId))
+    .orderBy(desc(schema.resumes.createdAt))
+    .limit(20);
+  return {
+    resume: rows.find((r) => !isLinkedInExport(r.text))?.text ?? null,
+    linkedin: rows.find((r) => isLinkedInExport(r.text))?.text ?? null,
+  };
 }

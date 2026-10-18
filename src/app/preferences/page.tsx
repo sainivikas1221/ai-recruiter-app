@@ -2,7 +2,7 @@ import Link from "next/link";
 import { deleteAccount } from "@/app/actions/auth";
 import { PreferencesForm } from "@/components/preferences-form";
 import { requireUser } from "@/lib/auth/user";
-import { getLatestResume, getPreferences } from "@/lib/preferences";
+import { getLatestDocuments, getLatestResume, getPreferences } from "@/lib/preferences";
 import type { Preferences } from "@/lib/profile";
 
 const EMPTY: Preferences = {
@@ -19,11 +19,13 @@ const EMPTY: Preferences = {
 
 export default async function PreferencesPage({ searchParams }: PageProps<"/preferences">) {
   const user = await requireUser();
-  const [prefs, resume, params] = await Promise.all([
+  const [prefs, resume, docs, params] = await Promise.all([
     getPreferences(user.id),
     getLatestResume(user.id),
+    getLatestDocuments(user.id),
     searchParams,
   ]);
+  const sources = docs.resume && docs.linkedin ? "your resume and LinkedIn profile" : docs.linkedin ? "your LinkedIn profile" : "your resume";
   const fromResume = params.from === "resume";
   const salaryEstimated = resume?.extracted?.salary?.isEstimate;
 
@@ -34,13 +36,22 @@ export default async function PreferencesPage({ searchParams }: PageProps<"/pref
         <h1 className="text-2xl font-bold">What you&apos;re looking for</h1>
         {fromResume && resume?.extractedBy === "claude" && (
           <p className="text-muted">
-            Our AI filled these in from your resume. Check them and change anything that isn&apos;t right.
+            Our AI filled these in from {sources}. Check them and change anything that isn&apos;t right.
             {salaryEstimated && " The salary is an estimate for your roles and location."}
           </p>
         )}
         {fromResume && resume?.extractedBy === "heuristic" && (
           <p className="text-muted">
-            We filled in what we could from your resume. Please check and complete the fields below.
+            We filled in what we could from {sources}. Please check and complete the fields below.
+          </p>
+        )}
+        {fromResume && (docs.resume ? !docs.linkedin : docs.linkedin) && (
+          <p className="mt-2 text-sm text-muted">
+            For better matches,{" "}
+            <Link href={docs.linkedin ? "/onboarding?add=resume" : "/onboarding?add=linkedin"} className="text-accent hover:underline">
+              {docs.linkedin ? "add your resume too" : "add your LinkedIn profile too"}
+            </Link>
+            . We&apos;ll combine both.
           </p>
         )}
         {!resume && (

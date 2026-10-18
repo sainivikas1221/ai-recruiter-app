@@ -136,3 +136,26 @@ export function remoteOpenTo(jobLocation: string | null, user: UserPlaces): "wor
   // A place we don't recognize: leave it in rather than hide a job by mistake.
   return "worldwide";
 }
+
+const CURRENCY: Record<string, string> = {
+  india: "INR", us: "USD", canada: "CAD", uk: "GBP", ireland: "EUR", germany: "EUR", france: "EUR",
+  netherlands: "EUR", spain: "EUR", portugal: "EUR", poland: "PLN", switzerland: "CHF", sweden: "SEK",
+  singapore: "SGD", uae: "AED", australia: "AUD", japan: "JPY", brazil: "BRL", mexico: "MXN",
+};
+
+/** The local currency of a place someone names, e.g. "Gurugram" → INR. */
+export function currencyFor(place: string): string | null {
+  return countriesIn(place).map((c) => CURRENCY[c]).find(Boolean) ?? null;
+}
+
+/** The first known city in a resume's header, written as people write it ("Gurugram"). */
+export function homeCity(resumeText: string): string | null {
+  const header = resumeText.split("\n").slice(0, 15).join("\n");
+  let best: { city: string; at: number } | null = null;
+  for (const city of Object.keys(CITY_COUNTRY)) {
+    const m = new RegExp(`(^|[^a-z])${city}(?![a-z])`, "i").exec(header);
+    const at = m ? m.index + m[1].length : -1;
+    if (at >= 0 && (!best || at < best.at || (at === best.at && city.length > best.city.length))) best = { city, at };
+  }
+  return best ? best.city.replace(/\b[a-z]/g, (c) => c.toUpperCase()) : null;
+}

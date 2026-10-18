@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { currencyFor } from "@/lib/jobs/geo";
 
 export const JOB_TYPES = ["full_time", "part_time", "contract", "internship", "temporary"] as const;
 export const WORK_MODES = ["remote", "hybrid", "onsite"] as const;
@@ -71,9 +72,37 @@ export function preferencesFromProfile(p: ExtractedProfile): Preferences {
     jobTypes: p.jobTypes.length ? p.jobTypes : ["full_time"],
     workModes: p.workModes.length ? p.workModes : ["remote"],
     locations: p.locations,
-    salaryCurrency: p.salary?.currency ?? null,
+    salaryCurrency: p.salary?.currency ?? (p.locations[0] ? currencyFor(p.locations[0]) : null),
     salaryMin: p.salary ? Math.round(p.salary.min) : null,
     salaryTarget: p.salary ? Math.round(p.salary.target) : null,
     yearsExperience: p.yearsExperience === null ? null : Math.round(p.yearsExperience),
+  };
+}
+
+/**
+ * Combines what was read from two documents about the same person (a resume and a LinkedIn
+ * profile). The first one wins where they disagree on a single value; lists are joined.
+ */
+export function mergeProfiles(first: ExtractedProfile, second: ExtractedProfile): ExtractedProfile {
+  const join = <T,>(a: T[], b: T[], max: number) => {
+    const seen = new Set<string>();
+    return [...a, ...b]
+      .filter((x) => {
+        const k = String(x).toLowerCase();
+        return !seen.has(k) && !!seen.add(k);
+      })
+      .slice(0, max);
+  };
+  const years = [first.yearsExperience, second.yearsExperience].filter((y): y is number => y !== null);
+  return {
+    fullName: first.fullName ?? second.fullName,
+    headline: first.headline !== "Professional" ? first.headline : second.headline,
+    roles: join(first.roles, second.roles, 5),
+    skills: join(first.skills, second.skills, 20),
+    yearsExperience: years.length ? Math.max(...years) : null,
+    jobTypes: join(first.jobTypes, second.jobTypes, 5),
+    workModes: join(first.workModes, second.workModes, 3),
+    locations: join(first.locations, second.locations, 5),
+    salary: first.salary && !first.salary.isEstimate ? first.salary : (second.salary ?? first.salary),
   };
 }

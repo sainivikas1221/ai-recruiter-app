@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { heuristicProfile } from "@/lib/ai/heuristic";
-import { preferencesFromProfile } from "@/lib/profile";
+import { mergeProfiles, preferencesFromProfile } from "@/lib/profile";
 
 const RESUME = `Priya Sharma
 Data Analyst · Bengaluru
@@ -17,7 +17,7 @@ describe("heuristicProfile", () => {
     expect(p.skills).toEqual(expect.arrayContaining(["SQL", "Python", "Tableau", "Power BI", "dbt", "Excel"]));
     expect(p.skills).not.toContain("R");
     expect(p.yearsExperience).toBe(6);
-    expect(p.workModes).toEqual(["remote", "hybrid"]);
+    expect(p.workModes).toEqual(["remote", "hybrid", "onsite"]);
   });
 });
 
@@ -79,5 +79,35 @@ describe("heuristicProfile on a LinkedIn profile PDF", () => {
       name: "Vikas Saini",
     });
     expect(p.roles[0]).toBe("Growth Lead");
+  });
+});
+
+describe("filling every field from a plain resume", () => {
+  const CV = `Asha Verma
+Gurugram, Haryana | asha@example.com
+Data Analyst with 6 years of experience. Expected CTC: 24 LPA
+Skills: SQL, Python, Tableau`;
+
+  it("reads the home city, office work there, and a stated salary", () => {
+    const p = heuristicProfile(CV);
+    expect(p.locations).toEqual(["Gurugram"]);
+    expect(p.workModes).toEqual(["remote", "hybrid", "onsite"]);
+    expect(p.salary).toEqual({ currency: "INR", min: 2_400_000, target: 2_400_000, isEstimate: false });
+    expect(preferencesFromProfile(p).salaryCurrency).toBe("INR");
+  });
+
+  it("uses the local currency when no salary is stated", () => {
+    const p = heuristicProfile(CV.replace(" Expected CTC: 24 LPA", ""));
+    expect(p.salary).toBeNull();
+    expect(preferencesFromProfile(p).salaryCurrency).toBe("INR");
+  });
+
+  it("combines a resume with a LinkedIn profile", () => {
+    const merged = mergeProfiles(heuristicProfile(CV), heuristicProfile(LINKEDIN_PDF, { name: "Vikas Saini" }));
+    expect(merged.roles).toEqual(expect.arrayContaining(["Data Analyst", "Product Manager"]));
+    expect(merged.skills).toEqual(expect.arrayContaining(["SQL", "Stakeholder Management"]));
+    expect(merged.locations).toEqual(["Gurugram"]);
+    expect(merged.yearsExperience).toBe(9);
+    expect(merged.salary?.min).toBe(2_400_000);
   });
 });

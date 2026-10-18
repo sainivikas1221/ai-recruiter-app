@@ -1,3 +1,4 @@
+import { currencyFor, homeCity } from "@/lib/jobs/geo";
 import type { ExtractedProfile, WorkMode } from "@/lib/profile";
 
 // A small vocabulary is enough for a local fallback; Claude does the real extraction.
@@ -36,12 +37,18 @@ const LINKEDIN_SECTIONS = new Set([
   "summary", "experience", "education", "volunteer experience", "projects", "courses",
 ]);
 
+/** Whether a document is LinkedIn's "Save to PDF" export of a profile. */
+export function isLinkedInExport(text: string) {
+  const lines = text.split("\n").map((l) => l.trim().toLowerCase());
+  return lines.includes("top skills") && lines.includes("experience");
+}
+
 /** Reads the fixed layout of a LinkedIn "Save to PDF" profile: top skills, headline and location. */
 function linkedinProfile(text: string, hints: ProfileHints) {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const lower = lines.map((l) => l.toLowerCase());
+  if (!isLinkedInExport(text)) return null;
   const skillsAt = lower.indexOf("top skills");
-  if (skillsAt === -1 || !lower.includes("experience")) return null;
 
   const skills: string[] = [];
   for (let i = skillsAt + 1; i < lines.length && !LINKEDIN_SECTIONS.has(lower[i]); i++) skills.push(lines[i]);
@@ -61,6 +68,25 @@ function roleFromHeadline(headline: string) {
   return words >= 1 && words <= 6 ? first : null;
 }
 
+const SYMBOLS: Record<string, string> = { $: "USD", "€": "EUR", "£": "GBP", "₹": "INR" };
+
+/** A salary the resume itself asks for, e.g. "Expected CTC: 25 LPA" or "Desired salary $120k". */
+function statedSalary(text: string, city: string | null): ExtractedProfile["salary"] {
+  const line = text.split("\n").find((l) => /\b(expected|expectation|desired)\b.*\b(ctc|salary|compensation|package)\b/i.test(l));
+  if (!line) return null;
+  const lakhs = /(\d+(?:\.\d+)?)\s*(?:lpa|lakhs?|lacs?)\b/i.exec(line);
+  if (lakhs) {
+    const amount = Math.round(Number(lakhs[1]) * 100_000);
+    return { currency: "INR", min: amount, target: amount, isEstimate: false };
+  }
+  const m = /([$€£₹])?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?\b/i.exec(line.replace(/^[^:\d$€£₹]*/, ""));
+  if (!m) return null;
+  const amount = Math.round(Number(m[2].replace(/,/g, "")) * (m[3] ? 1000 : 1));
+  const currency = (m[1] && SYMBOLS[m[1]]) || (city && currencyFor(city));
+  if (!currency || amount < 1000) return null;
+  return { currency, min: amount, target: amount, isEstimate: false };
+}
+
 export function heuristicProfile(text: string, hints: ProfileHints = {}): ExtractedProfile {
   const linkedin = linkedinProfile(text, hints);
   const unique = (xs: (string | null | undefined)[]) => {
@@ -78,8 +104,10 @@ export function heuristicProfile(text: string, hints: ProfileHints = {}): Extrac
   const years = [...text.matchAll(/(\d{1,2})\+?\s*(?:years|yrs)/gi)].map((m) => Number(m[1]));
   const yearsExperience = years.length ? Math.max(...years.filter((y) => y <= 45)) : null;
 
-  const workModes: WorkMode[] = ["remote"];
-  if (/\bhybrid\b/i.test(text)) workModes.push("hybrid");
+  const city = linkedin?.location?.split(",")[0].trim() || homeCity(text);
+  // Someone with a home city can also work from an office there.
+  const workModes: WorkMode[] = city ? ["remote", "hybrid", "onsite"] : ["remote"];
+  if (!city && /\bhybrid\b/i.test(text)) workModes.push("hybrid");
 
   const firstLine = text.split("\n").map((l) => l.trim()).find(Boolean) ?? "";
   const looksLikeName = /^[A-Za-z][A-Za-z .'-]{2,40}$/.test(firstLine) && firstLine.split(" ").length <= 4;
@@ -92,7 +120,7 @@ export function heuristicProfile(text: string, hints: ProfileHints = {}): Extrac
     yearsExperience: Number.isFinite(yearsExperience) ? yearsExperience : null,
     jobTypes: ["full_time"],
     workModes,
-    locations: linkedin?.location ? [linkedin.location.split(",")[0].trim()] : [],
-    salary: null,
+    locations: city ? [city] : [],
+    salary: statedSalary(text, city),
   };
 }

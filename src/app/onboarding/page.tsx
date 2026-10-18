@@ -3,23 +3,34 @@ import { ResumeUpload } from "@/components/resume-upload";
 import { requireUser } from "@/lib/auth/user";
 import { getLatestResume } from "@/lib/preferences";
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({ searchParams }: PageProps<"/onboarding">) {
   const user = await requireUser();
-  const resume = await getLatestResume(user.id);
+  const [resume, { add }] = await Promise.all([getLatestResume(user.id), searchParams]);
   // LinkedIn sign-in shares only name and email, so the profile comes from LinkedIn's own PDF export.
-  const fromLinkedIn = user.linkedin && !resume;
+  const fromLinkedIn = add === "linkedin" || (user.linkedin && !resume && add !== "resume");
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6">
       <div>
         <p className="font-mono text-xs text-muted uppercase">Step 1 of 2</p>
         <h1 className="text-2xl font-bold">
-          {fromLinkedIn ? "Import your LinkedIn profile" : resume ? "Upload a new resume" : "Upload your resume"}
+          {fromLinkedIn
+            ? "Import your LinkedIn profile"
+            : add === "resume"
+              ? "Add your resume"
+              : resume
+                ? "Upload a new resume"
+                : "Upload your resume"}
         </h1>
         <p className="text-muted">
           We&apos;ll pull out your skills, experience and the roles you fit, then suggest what to search for.
         </p>
       </div>
-      {resume && (
+      {add && (
+        <p className="text-sm text-muted">
+          We&apos;ll read it together with what you already uploaded and fill in your preferences from both.
+        </p>
+      )}
+      {resume && !add && (
         <p className="text-sm text-muted">
           Current resume: <span className="text-foreground">{resume.fileName}</span>, uploaded{" "}
           {resume.createdAt.toLocaleDateString("en", { dateStyle: "medium" })}. Uploading a new one
