@@ -31,12 +31,14 @@ and the same role listed on two sources is shown once.
 ## Running locally
 
 ```bash
-cp .env.example .env.local      # then set SESSION_SECRET
-docker compose up -d            # Postgres on localhost:5432
 npm install
-npm run db:migrate
-npm run dev                     # http://localhost:3000
+npm run setup     # asks for a Postgres connection string, writes .env.local, creates the tables
+npm run dev       # http://localhost:3000
 ```
+
+Any Postgres works: a free hosted one (for example Neon), or `docker compose up -d` for one on
+localhost:5432 (`postgres://app:app@localhost:5432/recruiter`). To fill `.env.local` by hand
+instead, copy `.env.example` and run `npm run db:migrate`.
 
 Without `ANTHROPIC_API_KEY` the app reads resumes with a simple keyword matcher, so the whole flow
 works offline. With a key, Claude does the extraction.
