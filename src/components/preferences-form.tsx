@@ -10,6 +10,9 @@ import {
   type Preferences,
 } from "@/lib/profile";
 
+// USD and INR first: most people pick one of these.
+const CURRENCIES = ["USD", "INR", "EUR", "GBP", "CAD", "AUD", "SGD", "AED"];
+
 export function PreferencesForm({ initial }: { initial: Preferences }) {
   const [state, formAction, pending] = useActionState(updatePreferences, undefined);
   return (
@@ -59,10 +62,20 @@ export function PreferencesForm({ initial }: { initial: Preferences }) {
       <div>
         <span className="label">Expected annual salary</span>
         <div className="grid grid-cols-[6rem_1fr_1fr] gap-2">
-          <input className="input" name="salaryCurrency" aria-label="Currency" placeholder="USD" maxLength={3} defaultValue={initial.salaryCurrency ?? ""} />
+          <select className="input" name="salaryCurrency" aria-label="Currency" defaultValue={initial.salaryCurrency ?? ""}>
+            <option value="">Currency</option>
+            {[...new Set([...CURRENCIES, ...(initial.salaryCurrency ? [initial.salaryCurrency] : [])])].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
           <input className="input" name="salaryMin" aria-label="Minimum" placeholder="Minimum" inputMode="numeric" defaultValue={initial.salaryMin ?? ""} />
           <input className="input" name="salaryTarget" aria-label="Target" placeholder="Target" inputMode="numeric" defaultValue={initial.salaryTarget ?? ""} />
         </div>
+        <p className="mt-1 text-xs text-muted">
+          Pick the currency first (USD for US dollars, INR for Indian rupees), then the yearly amounts in that currency.
+        </p>
       </div>
 
       <div>

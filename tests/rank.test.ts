@@ -90,6 +90,13 @@ describe("scoreJob", () => {
     expect(scoreJob(job({ employmentType: "Full-time" }), prefs, NOW)).not.toBeNull();
   });
 
+  it("shows freelance work to people who pick Freelance", () => {
+    const freelancer = { ...prefs, jobTypes: ["freelance" as const] };
+    expect(scoreJob(job({ employmentType: "freelance" }), freelancer, NOW)).not.toBeNull();
+    expect(scoreJob(job({ employmentType: "Full-time" }), freelancer, NOW)).toBeNull();
+    expect(scoreJob(job({ employmentType: "freelance" }), prefs, NOW)).toBeNull();
+  });
+
   it("rewards pay at or above target and flags pay below minimum", () => {
     const high = scoreJob(job({ salaryMax: 130000, salaryCurrency: "USD" }), prefs, NOW)!;
     const low = scoreJob(job({ salaryMax: 60000, salaryCurrency: "USD" }), prefs, NOW)!;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { currencyFor } from "@/lib/jobs/geo";
 
-export const JOB_TYPES = ["full_time", "part_time", "contract", "internship", "temporary"] as const;
+export const JOB_TYPES = ["full_time", "part_time", "contract", "freelance", "internship", "temporary"] as const;
 export const WORK_MODES = ["remote", "hybrid", "onsite"] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -11,6 +11,7 @@ export const JOB_TYPE_LABELS: Record<JobType, string> = {
   full_time: "Full-time",
   part_time: "Part-time",
   contract: "Contract",
+  freelance: "Freelance (per project)",
   internship: "Internship",
   temporary: "Temporary",
 };

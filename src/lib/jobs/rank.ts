@@ -63,7 +63,8 @@ function normalizePlace(s: string) {
 const EMPLOYMENT_ALIASES: Record<string, string[]> = {
   full_time: ["full", "permanent", "fulltime", "full_time", "full-time"],
   part_time: ["part", "parttime", "part_time", "part-time"],
-  contract: ["contract", "contractor", "freelance"],
+  contract: ["contract", "contractor"],
+  freelance: ["freelance", "freelancer", "per project", "project-based", "project based"],
   internship: ["intern"],
   temporary: ["temp"],
 };
