@@ -5,17 +5,23 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getSession } from "./session";
 
-export type CurrentUser = { id: string; email: string; name: string | null };
+export type CurrentUser = { id: string; email: string; name: string | null; linkedin: boolean };
 
 /** The signed-in user, or null. Cached for the length of one request. */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await getSession();
   if (!session.userId) return null;
   const [user] = await db
-    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
+    .select({
+      id: schema.users.id,
+      email: schema.users.email,
+      name: schema.users.name,
+      linkedinId: schema.users.linkedinId,
+    })
     .from(schema.users)
     .where(eq(schema.users.id, session.userId));
-  return user ?? null;
+  if (!user) return null;
+  return { id: user.id, email: user.email, name: user.name, linkedin: Boolean(user.linkedinId) };
 });
 
 export async function requireUser(): Promise<CurrentUser> {

@@ -27,7 +27,7 @@ export async function uploadResume(_prev: UploadState, formData: FormData): Prom
 
   let extraction;
   try {
-    extraction = await extractProfile(text);
+    extraction = await extractProfile(text, { name: user.name });
   } catch (err) {
     console.error("Resume extraction failed", err);
     return { error: "Our AI couldn't read your resume just now. Please try again in a minute." };

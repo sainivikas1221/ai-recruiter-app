@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { ExtractedProfileSchema, type ExtractedProfile } from "@/lib/profile";
-import { heuristicProfile } from "./heuristic";
+import { heuristicProfile, type ProfileHints } from "./heuristic";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5";
 
@@ -18,9 +18,9 @@ export type Extraction = { profile: ExtractedProfile; by: "claude" | "heuristic"
  * Reads a resume and suggests preferences. Uses Claude when ANTHROPIC_API_KEY is set,
  * otherwise a keyword-based fallback so the app still works in local development.
  */
-export async function extractProfile(resumeText: string): Promise<Extraction> {
+export async function extractProfile(resumeText: string, hints: ProfileHints = {}): Promise<Extraction> {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return { profile: heuristicProfile(resumeText), by: "heuristic" };
+    return { profile: heuristicProfile(resumeText, hints), by: "heuristic" };
   }
 
   const client = new Anthropic();
@@ -36,7 +36,7 @@ export async function extractProfile(resumeText: string): Promise<Extraction> {
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     // Fall back rather than leave the user with an empty form.
-    return { profile: heuristicProfile(resumeText), by: "heuristic" };
+    return { profile: heuristicProfile(resumeText, hints), by: "heuristic" };
   }
   return { profile: response.parsed_output, by: "claude" };
 }
