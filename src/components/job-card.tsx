@@ -37,9 +37,17 @@ function age(date: Date) {
 }
 
 export function JobCard({ job }: { job: RankedJob }) {
+  const remote = job.workMode === "remote";
+  const place = remote
+    ? job.location && !/^remote$/i.test(job.location.trim())
+      ? job.location.toLowerCase().includes("remote")
+        ? job.location
+        : `Remote · ${job.location}`
+      : "Remote · Worldwide"
+    : job.location;
   const meta = [
     job.company,
-    job.location,
+    place,
     job.workMode && job.workMode !== "remote" && !job.location?.toLowerCase().includes(job.workMode)
       ? job.workMode
       : null,

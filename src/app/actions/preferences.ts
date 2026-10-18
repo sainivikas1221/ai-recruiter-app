@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/user";
@@ -69,5 +70,7 @@ export async function updatePreferences(
     return { error: "Add a currency for your salary, like USD or INR." };
   }
   await savePreferences(user.id, prefs);
+  // Drop any page the browser kept so /jobs and /preferences show the new choices.
+  revalidatePath("/", "layout");
   redirect("/jobs");
 }

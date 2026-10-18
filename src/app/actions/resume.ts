@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -50,5 +51,6 @@ export async function uploadResume(_prev: UploadState, formData: FormData): Prom
       .set({ name: extraction.profile.fullName })
       .where(and(eq(schema.users.id, user.id), isNull(schema.users.name)));
   }
+  revalidatePath("/", "layout");
   redirect("/preferences?from=resume");
 }

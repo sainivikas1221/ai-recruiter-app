@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   // Null for accounts that only sign in with Google.
   passwordHash: text("password_hash"),
   googleId: text("google_id").unique(),
+  linkedinId: text("linkedin_id").unique(),
   // Everyone starts on a free trial; billing arrives in a later phase.
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

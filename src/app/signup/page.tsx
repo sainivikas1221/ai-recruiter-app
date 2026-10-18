@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signUp } from "@/app/actions/auth";
 import { AuthForm } from "@/components/auth-form";
-import { GoogleButton } from "@/components/google-button";
+import { OAuthButtons } from "@/components/oauth-buttons";
 import { getCurrentUser, TRIAL_DAYS } from "@/lib/auth/user";
 
 export default async function SignupPage() {
@@ -14,7 +14,7 @@ export default async function SignupPage() {
         <p className="text-sm text-muted">Free for {TRIAL_DAYS} days. No card needed.</p>
       </div>
       <div className="card flex flex-col gap-4">
-        <GoogleButton />
+        <OAuthButtons />
         <AuthForm mode="signup" action={signUp} />
       </div>
       <p className="text-sm text-muted">

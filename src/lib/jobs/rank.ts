@@ -1,5 +1,6 @@
 import type { Preferences } from "@/lib/profile";
 import type { NormalizedJob } from "./types";
+import { inUserPlace, remoteOpenTo, userPlaces, type UserPlaces } from "./geo";
 
 export type RankableJob = Omit<NormalizedJob, "postedAt"> & {
   id: string;
@@ -7,7 +8,8 @@ export type RankableJob = Omit<NormalizedJob, "postedAt"> & {
   fetchedAt: Date;
 };
 
-export type RankedJob = RankableJob & { score: number; reasons: string[] };
+/** `local` = in one of the user's places, or remote and open to people living there. */
+export type RankedJob = RankableJob & { score: number; reasons: string[]; local: boolean };
 
 const STOPWORDS = new Set([
   "and", "or", "of", "the", "a", "an", "for", "to", "in", "with", "at", "on", "i", "ii", "iii",
@@ -96,7 +98,8 @@ export function scoreJob(
   job: RankableJob,
   prefs: Preferences,
   now = new Date(),
-): { score: number; reasons: string[] } | null {
+  places: UserPlaces = userPlaces(prefs.locations),
+): { score: number; reasons: string[]; local: boolean } | null {
   const reasons: string[] = [];
 
   const title = titleMatch(job.title, prefs.roles);
@@ -114,20 +117,31 @@ export function scoreJob(
   // Location and work mode.
   const wantsRemote = prefs.workModes.includes("remote");
   const wantsInPerson = prefs.workModes.includes("hybrid") || prefs.workModes.includes("onsite");
-  const place = normalizePlace(job.location ?? "");
-  const inWantedPlace =
-    !!place && prefs.locations.some((l) => normalizePlace(l) && place.includes(normalizePlace(l)));
+  const where = inUserPlace(job.location, places);
   let placeScore: number;
+  let local = false;
   if (job.workMode === "remote") {
-    if (!wantsRemote && !inWantedPlace) return null;
-    placeScore = wantsRemote ? 1 : 0.6;
-    if (wantsRemote) reasons.push("Remote");
-  } else if (inWantedPlace) {
+    if (where === "city") {
+      placeScore = 1;
+      local = true;
+      reasons.push(`Remote, based in ${job.location}`);
+    } else if (!wantsRemote) {
+      return null;
+    } else {
+      // Only remote jobs someone living in the user's places is allowed to take.
+      const open = remoteOpenTo(job.location, places);
+      if (!open) return null;
+      placeScore = open === "country" ? 0.9 : 0.7;
+      local = open === "country";
+      reasons.push(open === "country" ? `Remote, open in ${job.location}` : "Remote, open worldwide");
+    }
+  } else if (where === "city" || (where === "country" && places.cities.size === 0)) {
     if (job.workMode && !prefs.workModes.includes(job.workMode) && !wantsInPerson) return null;
     placeScore = 1;
+    local = true;
     reasons.push(`In ${job.location}`);
-  } else if (prefs.locations.length && job.workMode) {
-    // An office job somewhere the user hasn't said they want to work.
+  } else if (prefs.locations.length && job.location) {
+    // An office (or unspecified) job somewhere the user hasn't said they want to work.
     return null;
   } else {
     placeScore = 0.4;
@@ -166,14 +180,15 @@ export function scoreJob(
   const titleWeight = prefs.roles.length ? 45 * title : 20;
   const score =
     titleWeight + 25 * skillScore + 15 * placeScore + 10 * salaryScore + 5 * recency;
-  return { score: Math.round(Math.min(100, score)), reasons };
+  return { score: Math.round(Math.min(100, score)), reasons, local };
 }
 
 /** Ranks jobs best first and drops near-duplicate listings of the same role. */
 export function rankJobs(jobs: RankableJob[], prefs: Preferences, now = new Date()): RankedJob[] {
+  const places = userPlaces(prefs.locations);
   const scored: RankedJob[] = [];
   for (const job of jobs) {
-    const result = scoreJob(job, prefs, now);
+    const result = scoreJob(job, prefs, now, places);
     if (result) scored.push({ ...job, ...result });
   }
   scored.sort(

@@ -1,15 +1,15 @@
 import "server-only";
 import { Google } from "arctic";
+import { appUrl } from "./app-url";
 
 export function googleEnabled() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
-export function googleClient() {
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+export async function googleClient() {
   return new Google(
     process.env.GOOGLE_CLIENT_ID!,
     process.env.GOOGLE_CLIENT_SECRET!,
-    `${appUrl}/api/auth/google/callback`,
+    `${await appUrl()}/api/auth/google/callback`,
   );
 }

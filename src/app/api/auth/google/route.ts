@@ -8,7 +8,7 @@ export async function GET() {
   }
   const state = generateState();
   const verifier = generateCodeVerifier();
-  const url = googleClient().createAuthorizationURL(state, verifier, ["openid", "profile", "email"]);
+  const url = (await googleClient()).createAuthorizationURL(state, verifier, ["openid", "profile", "email"]);
 
   const session = await getSession();
   session.oauthState = state;

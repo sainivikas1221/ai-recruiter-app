@@ -52,7 +52,8 @@ describe("scoreJob", () => {
     const result = scoreJob(job({}), prefs, NOW)!;
     expect(result.score).toBeGreaterThanOrEqual(80);
     expect(result.reasons).toContain("Title matches your target role");
-    expect(result.reasons).toContain("Remote");
+    expect(result.reasons).toContain("Remote, open worldwide");
+    expect(result.local).toBe(false);
     expect(result.reasons.some((r) => r.startsWith("Mentions SQL"))).toBe(true);
   });
 
@@ -63,6 +64,20 @@ describe("scoreJob", () => {
   it("drops office jobs in cities the user didn't pick", () => {
     expect(scoreJob(job({ location: "Berlin", workMode: "onsite" }), prefs, NOW)).toBeNull();
     expect(scoreJob(job({ location: "Bengaluru, India", workMode: "hybrid" }), prefs, NOW)).not.toBeNull();
+  });
+
+  it("keeps Gurgaon jobs and drops other regions for a Gurgaon user", () => {
+    const gurgaon = { ...prefs, locations: ["Gurgaon"], workModes: ["remote" as const, "hybrid" as const, "onsite" as const] };
+    const local = scoreJob(job({ location: "Gurugram, Haryana, India", workMode: "onsite" }), gurgaon, NOW)!;
+    expect(local.local).toBe(true);
+    expect(local.reasons).toContain("In Gurugram, Haryana, India");
+    expect(scoreJob(job({ location: "Remote - India", workMode: "remote" }), gurgaon, NOW)!.local).toBe(true);
+    expect(scoreJob(job({ location: "Remote (US only)", workMode: "remote" }), gurgaon, NOW)).toBeNull();
+    expect(scoreJob(job({ location: "London, UK", workMode: "hybrid" }), gurgaon, NOW)).toBeNull();
+    expect(scoreJob(job({ location: "Berlin", workMode: null }), gurgaon, NOW)).toBeNull();
+    const worldwide = scoreJob(job({ location: "Worldwide", workMode: "remote" }), gurgaon, NOW)!;
+    expect(worldwide.local).toBe(false);
+    expect(local.score).toBeGreaterThan(worldwide.score);
   });
 
   it("drops remote jobs when the user only wants to work in person elsewhere", () => {

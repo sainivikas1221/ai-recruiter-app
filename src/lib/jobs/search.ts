@@ -11,6 +11,7 @@ import { fetchAshby } from "./sources/ashby";
 import { fetchRemotive } from "./sources/remotive";
 import { fetchArbeitnow } from "./sources/arbeitnow";
 import { adzunaEnabled, fetchAdzuna } from "./sources/adzuna";
+import { ADZUNA_COUNTRY, userPlaces } from "./geo";
 
 /** How long a feed's results are reused before we read it again. */
 const FEED_TTL_MS = 6 * 60 * 60 * 1000;
@@ -41,12 +42,16 @@ function feedsFor(prefs: Preferences): Feed[] {
 
   feeds.push({ key: "arbeitnow", load: () => fetchArbeitnow(fetchJson) });
 
+  // Adzuna searches one country at a time: the one the user picked, unless the host pins one.
+  const places = userPlaces(prefs.locations);
+  const userCountry = [...places.countries].map((c) => ADZUNA_COUNTRY[c]).find(Boolean);
+  const country = (process.env.ADZUNA_COUNTRY ?? userCountry ?? "us").toLowerCase();
+  const where = places.cities.size ? prefs.locations.find((l) => !/^(remote|anywhere)$/i.test(l.trim())) ?? null : null;
+
   for (const role of prefs.roles.slice(0, 3)) {
     const q = role.toLowerCase();
     feeds.push({ key: `remotive:${q}`, load: () => fetchRemotive(q, fetchJson) });
     if (adzunaEnabled()) {
-      const country = (process.env.ADZUNA_COUNTRY ?? "us").toLowerCase();
-      const where = prefs.locations[0] ?? null;
       feeds.push({
         key: `adzuna:${country}:${q}:${where ?? ""}`.toLowerCase(),
         load: () => fetchAdzuna(q, where, country, fetchJson),

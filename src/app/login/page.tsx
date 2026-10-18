@@ -2,12 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signIn } from "@/app/actions/auth";
 import { AuthForm } from "@/components/auth-form";
-import { GoogleButton } from "@/components/google-button";
+import { OAuthButtons } from "@/components/oauth-buttons";
 import { getCurrentUser } from "@/lib/auth/user";
 
 const ERRORS: Record<string, string> = {
   google: "Google sign-in didn't complete. Please try again.",
   "google-email": "Your Google account needs a verified email address.",
+  linkedin: "LinkedIn sign-in didn't complete. Please try again.",
+  "linkedin-email": "Your LinkedIn account needs a verified email address.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -17,7 +19,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     <div className="mx-auto flex max-w-sm flex-col gap-6">
       <h1 className="text-2xl font-bold">Sign in</h1>
       <div className="card flex flex-col gap-4">
-        <GoogleButton />
+        <OAuthButtons />
         <AuthForm
           mode="signin"
           action={signIn}

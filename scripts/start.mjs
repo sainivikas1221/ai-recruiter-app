@@ -66,6 +66,8 @@ async function main() {
   console.log("\n=== JobPilot ===\n");
   const { anthropicApiKey } = await settings();
   if (anthropicApiKey && !process.env.ANTHROPIC_API_KEY) process.env.ANTHROPIC_API_KEY = anthropicApiKey;
+  // One copy on one computer: the built-in database is the right choice here.
+  process.env.JOBPILOT_LOCAL = "1";
 
   if (!existsSync(path.join(".next", "BUILD_ID"))) {
     console.log("\nPreparing the app. This happens once and takes a minute or two...\n");

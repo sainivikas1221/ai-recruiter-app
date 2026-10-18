@@ -24,6 +24,11 @@ export default async function OnboardingPage() {
       <div className="card">
         <ResumeUpload />
       </div>
+      <p className="text-sm text-muted">
+        No resume handy? Use your LinkedIn profile: open your profile on linkedin.com, click{" "}
+        <span className="text-foreground">Resources</span> (or <span className="text-foreground">More</span>), then{" "}
+        <span className="text-foreground">Save to PDF</span>, and upload that file here.
+      </p>
       <p className="text-xs text-muted">
         We keep the text of your resume to match you with jobs, not the file itself. You can delete
         your account and data at any time.

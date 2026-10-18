@@ -32,6 +32,12 @@ function open(): Database {
   } else {
     // No database configured: run Postgres inside the app (PGlite), stored on disk.
     // Good for running on your own computer; use real Postgres when hosting.
+    if (process.env.NODE_ENV === "production" && !process.env.JOBPILOT_LOCAL) {
+      console.warn(
+        "[jobpilot] No DATABASE_URL set, so the built-in database is in use. On a host that runs more than " +
+          "one copy of the app, each copy sees different data (old preferences, lost sign-ins). Set DATABASE_URL.",
+      );
+    }
     fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
     const client = new PGlite(path.join(LOCAL_DATA_DIR, "db"));
     // Both drivers expose the same query builder; the result types differ only in metadata.

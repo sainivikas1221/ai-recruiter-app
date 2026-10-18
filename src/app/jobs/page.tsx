@@ -10,12 +10,13 @@ import type { Preferences } from "@/lib/profile";
 
 const PAGE_SIZE = 50;
 
-type Filters = { remoteOnly: boolean; minScore: number; limit: number };
+type Filters = { remoteOnly: boolean; localOnly: boolean; minScore: number; limit: number };
 
 function filtersFrom(params: Record<string, string | string[] | undefined>): Filters {
   const num = (v: unknown, d: number) => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : d);
   return {
     remoteOnly: params.remote === "1",
+    localOnly: params.near === "1",
     minScore: Math.min(100, num(params.min, 0)),
     limit: Math.min(500, num(params.limit, PAGE_SIZE)),
   };
@@ -25,6 +26,7 @@ function href(f: Filters, change: Partial<Filters>) {
   const next = { ...f, ...change };
   const q = new URLSearchParams();
   if (next.remoteOnly) q.set("remote", "1");
+  if (next.localOnly) q.set("near", "1");
   if (next.minScore) q.set("min", String(next.minScore));
   if (next.limit !== PAGE_SIZE) q.set("limit", String(next.limit));
   const s = q.toString();
@@ -35,7 +37,10 @@ async function Results({ prefs, filters }: { prefs: Preferences; filters: Filter
   const { jobs, feedResults } = await searchJobs(prefs);
   const failed = feedResults.filter((f) => !f.ok);
   const shown = jobs.filter(
-    (j) => j.score >= filters.minScore && (!filters.remoteOnly || j.workMode === "remote"),
+    (j) =>
+      j.score >= filters.minScore &&
+      (!filters.remoteOnly || j.workMode === "remote") &&
+      (!filters.localOnly || j.local),
   );
 
   return (
@@ -46,6 +51,14 @@ async function Results({ prefs, filters }: { prefs: Preferences; filters: Filter
           <span className="font-normal text-muted"> · best match first</span>
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
+          {prefs.locations.length > 0 && (
+            <Link
+              href={href(filters, { localOnly: !filters.localOnly, limit: PAGE_SIZE })}
+              className={`chip ${filters.localOnly ? "border-accent bg-accent-soft" : ""}`}
+            >
+              In {prefs.locations.join(", ")}
+            </Link>
+          )}
           <Link
             href={href(filters, { remoteOnly: !filters.remoteOnly, limit: PAGE_SIZE })}
             className={`chip ${filters.remoteOnly ? "border-accent bg-accent-soft" : ""}`}
@@ -114,7 +127,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
         </form>
       </div>
       <Suspense
-        key={JSON.stringify(filters)}
+        key={JSON.stringify([filters, prefs])}
         fallback={
           <div className="card text-center text-muted">
             Searching company career pages and job boards…
