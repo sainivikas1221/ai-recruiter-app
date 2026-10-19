@@ -11,23 +11,32 @@ import { fetchAshby } from "./sources/ashby";
 import { fetchRemotive } from "./sources/remotive";
 import { fetchArbeitnow } from "./sources/arbeitnow";
 import { adzunaEnabled, fetchAdzuna } from "./sources/adzuna";
-import { ADZUNA_COUNTRY, userPlaces } from "./geo";
+import { fetchJSearch, jsearchEnabled } from "./sources/jsearch";
+import { fetchJooble, joobleEnabled } from "./sources/jooble";
+import { fetchHimalayas } from "./sources/himalayas";
+import { fetchJobicy } from "./sources/jobicy";
+import { ADZUNA_COUNTRY, countryLabel, userPlaces } from "./geo";
+import { searchTerms } from "./roles";
 
 /** How long a feed's results are reused before we read it again. */
 const FEED_TTL_MS = 6 * 60 * 60 * 1000;
+/** Paid-per-call APIs with small free allowances are read less often. */
+const METERED_TTL_MS = 24 * 60 * 60 * 1000;
 /** Jobs older than this are not shown. */
 const MAX_JOB_AGE_DAYS = 45;
 
-const fetchJson: FetchJson = async (url) => {
+const fetchJson: FetchJson = async (url, init) => {
   const res = await fetch(url, {
-    headers: { Accept: "application/json", "User-Agent": "JobPilot/0.1 (job search app)" },
+    method: init?.method ?? "GET",
+    body: init?.body,
+    headers: { Accept: "application/json", "User-Agent": "JobPilot/0.1 (job search app)", ...init?.headers },
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 };
 
-type Feed = { key: string; load: () => Promise<NormalizedJob[]> };
+type Feed = { key: string; load: () => Promise<NormalizedJob[]>; ttlMs?: number };
 
 function feedsFor(prefs: Preferences): Feed[] {
   const feeds: Feed[] = parseBoards(process.env.JOB_BOARDS).map((b) => ({
@@ -42,19 +51,40 @@ function feedsFor(prefs: Preferences): Feed[] {
 
   feeds.push({ key: "arbeitnow", load: () => fetchArbeitnow(fetchJson) });
 
-  // Adzuna searches one country at a time: the one the user picked, unless the host pins one.
+  // Aggregators search one country at a time: the one the user picked, unless the host pins one.
   const places = userPlaces(prefs.locations);
+  const userCountryName = [...places.countries][0] ?? null;
   const userCountry = [...places.countries].map((c) => ADZUNA_COUNTRY[c]).find(Boolean);
   const country = (process.env.ADZUNA_COUNTRY ?? userCountry ?? "us").toLowerCase();
-  const where = places.cities.size ? prefs.locations.find((l) => !/^(remote|anywhere)$/i.test(l.trim())) ?? null : null;
+  const city = places.cities.size ? prefs.locations.find((l) => !/^(remote|anywhere)$/i.test(l.trim())) ?? null : null;
+  const where = city ?? (userCountryName ? countryLabel(userCountryName) : null);
 
-  for (const role of prefs.roles.slice(0, 3)) {
-    const q = role.toLowerCase();
+  // The user's roles plus other common titles for the same work ("Visual Designer" for "Graphic Designer").
+  const terms = searchTerms(prefs.roles);
+  for (const q of terms) {
     feeds.push({ key: `remotive:${q}`, load: () => fetchRemotive(q, fetchJson) });
+    feeds.push({ key: `himalayas:${q}`, load: () => fetchHimalayas(q, fetchJson) });
+    feeds.push({ key: `jobicy:${q}`, load: () => fetchJobicy(q, fetchJson) });
     if (adzunaEnabled()) {
       feeds.push({
-        key: `adzuna:${country}:${q}:${where ?? ""}`.toLowerCase(),
-        load: () => fetchAdzuna(q, where, country, fetchJson),
+        key: `adzuna:${country}:${q}:${city ?? ""}`.toLowerCase(),
+        load: () => fetchAdzuna(q, city, country, fetchJson),
+      });
+    }
+    if (joobleEnabled()) {
+      feeds.push({
+        key: `jooble:${q}:${where ?? ""}`.toLowerCase(),
+        load: () => fetchJooble(q, where, fetchJson),
+      });
+    }
+  }
+  // Google for Jobs covers the most sites but has the smallest free allowance: own roles only, once a day.
+  if (jsearchEnabled()) {
+    for (const q of terms.slice(0, Math.min(2, prefs.roles.length))) {
+      feeds.push({
+        key: `jsearch:${country}:${q}:${where ?? ""}`.toLowerCase(),
+        load: () => fetchJSearch(q, where, country, fetchJson),
+        ttlMs: METERED_TTL_MS,
       });
     }
   }
@@ -97,20 +127,23 @@ export type FeedStatus = { key: string; ok: boolean; jobCount: number; error: st
 export async function refreshFeeds(prefs: Preferences, force = false): Promise<FeedStatus[]> {
   const feeds = feedsFor(prefs);
   const keys = feeds.map((f) => f.key);
-  const fresh = force
-    ? []
-    : await db
-        .select({ key: schema.sourceRuns.key })
-        .from(schema.sourceRuns)
-        .where(
-          and(
-            inArray(schema.sourceRuns.key, keys),
-            eq(schema.sourceRuns.ok, true),
-            gt(schema.sourceRuns.ranAt, new Date(Date.now() - FEED_TTL_MS)),
-          ),
-        );
-  const freshKeys = new Set(fresh.map((r) => r.key));
-  const stale = feeds.filter((f) => !freshKeys.has(f.key));
+  const runs = await db
+    .select({ key: schema.sourceRuns.key, ranAt: schema.sourceRuns.ranAt })
+    .from(schema.sourceRuns)
+    .where(
+      and(
+        inArray(schema.sourceRuns.key, keys),
+        eq(schema.sourceRuns.ok, true),
+        gt(schema.sourceRuns.ranAt, new Date(Date.now() - METERED_TTL_MS)),
+      ),
+    );
+  const lastRun = new Map(runs.map((r) => [r.key, r.ranAt.getTime()]));
+  // "Search again" re-reads every feed except metered ones, whose free allowance it would use up.
+  const stale = feeds.filter((f) => {
+    if (force && !f.ttlMs) return true;
+    const ran = lastRun.get(f.key);
+    return ran === undefined || ran < Date.now() - (f.ttlMs ?? FEED_TTL_MS);
+  });
 
   const results = await Promise.all(
     stale.map(async (feed): Promise<FeedStatus> => {

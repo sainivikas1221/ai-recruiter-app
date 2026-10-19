@@ -62,9 +62,20 @@ async function settings() {
   return saved;
 }
 
+// Optional keys (job search APIs and the like), one NAME=value per line, kept across new downloads.
+function loadKeys() {
+  const file = path.join(DATA_DIR, "keys.env");
+  if (!existsSync(file)) return;
+  for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+    const m = /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (m && m[2] && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+}
+
 async function main() {
   console.log("\n=== JobPilot ===\n");
   const { anthropicApiKey } = await settings();
+  loadKeys();
   if (anthropicApiKey && !process.env.ANTHROPIC_API_KEY) process.env.ANTHROPIC_API_KEY = anthropicApiKey;
   // One copy on one computer: the built-in database is the right choice here.
   process.env.JOBPILOT_LOCAL = "1";

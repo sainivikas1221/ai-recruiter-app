@@ -18,4 +18,5 @@ export type NormalizedJob = {
   applyViaAts: boolean;
 };
 
-export type FetchJson = (url: string) => Promise<unknown>;
+export type FetchInit = { method?: "GET" | "POST"; headers?: Record<string, string>; body?: string };
+export type FetchJson = (url: string, init?: FetchInit) => Promise<unknown>;

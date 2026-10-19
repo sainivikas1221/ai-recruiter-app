@@ -61,13 +61,18 @@ export function parseSalaryText(text: string | null | undefined): {
             ? "CAD"
             : null;
 
-  const numbers = [...t.matchAll(/(\d[\d,.]*)\s*(k|lpa|lakh|l\b)?/g)]
-    .map((m) => {
+  // In a range like "3 - 4.5 lakh" or "80-100k" the unit is written once, after the last number.
+  const matches = [...t.matchAll(/(\d[\d,.]*)\s*(k|lpa|lakhs?|l\b)?/g)];
+  const units = matches.map((m) => m[2]);
+  for (let i = units.length - 2; i >= 0; i--) units[i] ??= units[i + 1];
+  const numbers = matches
+    .map((m, i) => {
       const raw = m[1].replace(/[.,](?=\d{3}\b)/g, "").replace(/,/g, "");
       let n = Number(raw);
       if (!Number.isFinite(n) || n === 0) return null;
-      if (m[2] === "k") n *= 1000;
-      if (m[2] === "lpa" || m[2] === "lakh" || m[2] === "l") n *= 100000;
+      const unit = units[i];
+      if (unit === "k") n *= 1000;
+      if (unit && unit !== "k") n *= 100000;
       return n;
     })
     .filter((n): n is number => n !== null);

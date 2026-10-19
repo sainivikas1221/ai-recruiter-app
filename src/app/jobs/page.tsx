@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { refreshJobs } from "@/app/actions/jobs";
 import { JobCard } from "@/components/job-card";
+import { SearchElsewhere } from "@/components/search-elsewhere";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { canAutoApply } from "@/lib/apply/eligibility";
@@ -106,7 +107,7 @@ async function Results({ userId, prefs, filters }: { userId: string; prefs: Pref
         <div className="card text-center text-muted">
           <p>No matching jobs yet.</p>
           <p className="text-sm">
-            Try adding more roles or allowing remote work on your{" "}
+            Try the job sites below, or add more roles or allow remote work on your{" "}
             <Link href="/preferences" className="text-accent hover:underline">preferences</Link>.
           </p>
         </div>
@@ -171,6 +172,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
       >
         <Results userId={user.id} prefs={prefs} filters={filters} />
       </Suspense>
+      <SearchElsewhere prefs={prefs} />
     </div>
   );
 }

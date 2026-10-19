@@ -71,6 +71,11 @@ export const ADZUNA_COUNTRY: Record<string, string> = {
   mexico: "mx",
 };
 
+/** How a country key is written for people and search boxes: "india" → "India", "uk" → "UK". */
+export function countryLabel(country: string): string {
+  return country.length <= 3 ? country.toUpperCase() : country.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
 function norm(s: string) {
   return ` ${s.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim()} `;
 }
