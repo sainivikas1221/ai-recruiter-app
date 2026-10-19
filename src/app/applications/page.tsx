@@ -76,7 +76,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/app
           <p>No applications yet.</p>
           <p className="text-sm">
             On <Link href="/jobs?auto=1" className="text-accent hover:underline">your jobs</Link>, tick the jobs you
-            want JobPilot to apply to, or press &ldquo;I applied&rdquo; on jobs you applied to yourself.
+            want JobPilot to apply to, or press &ldquo;Mark as applied by me&rdquo; on jobs you applied to yourself.
           </p>
         </div>
       ) : (

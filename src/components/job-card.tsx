@@ -1,4 +1,4 @@
-import { markApplied } from "@/app/actions/apply";
+import { markApplied, unmarkApplied } from "@/app/actions/apply";
 import type { RankedJob } from "@/lib/jobs/rank";
 import { STATUS_LABELS, type ApplicationSummary } from "@/lib/apply/labels";
 
@@ -99,8 +99,15 @@ export function JobCard({
           {autoApply && !application && " · JobPilot can apply for you"}
         </p>
         {application && (
-          <p className="mt-1 text-xs font-medium text-accent">
-            {STATUS_LABELS[application.status]} · {application.appliedBy === "user" ? "by you" : "by JobPilot"}
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-accent">
+            {application.appliedBy === "user"
+              ? "You marked this as applied yourself"
+              : `JobPilot: ${STATUS_LABELS[application.status]}`}
+            {application.appliedBy === "user" && (
+              <button formAction={unmarkApplied.bind(null, job.id)} className="font-normal text-muted hover:underline">
+                Undo
+              </button>
+            )}
           </p>
         )}
       </div>
@@ -118,9 +125,9 @@ export function JobCard({
           <button
             formAction={markApplied.bind(null, job.id)}
             className="text-xs text-muted hover:underline"
-            title="Add this job to your applications"
+            title="Use this when you applied to this job yourself. JobPilot doesn't send anything."
           >
-            I applied
+            Mark as applied by me
           </button>
         )}
       </div>

@@ -89,7 +89,7 @@ async function ownApplication(userId: string, id: string) {
   return row ?? null;
 }
 
-/** "I applied": records a job the person applied to themselves. */
+/** "Mark as applied by me": records a job the person applied to themselves. */
 export async function markApplied(jobId: string) {
   const user = await requireUser();
   const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
@@ -110,6 +110,21 @@ export async function markApplied(jobId: string) {
     .insert(schema.applications)
     .values(values)
     .onConflictDoUpdate({ target: [schema.applications.userId, schema.applications.jobId], set: values });
+  revalidatePath("/", "layout");
+}
+
+/** Undoes "Mark as applied by me". Applications JobPilot made are kept. */
+export async function unmarkApplied(jobId: string) {
+  const user = await requireUser();
+  await db
+    .delete(schema.applications)
+    .where(
+      and(
+        eq(schema.applications.userId, user.id),
+        eq(schema.applications.jobId, jobId),
+        eq(schema.applications.appliedBy, "user"),
+      ),
+    );
   revalidatePath("/", "layout");
 }
 
