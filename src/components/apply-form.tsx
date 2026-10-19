@@ -47,7 +47,7 @@ export function ApplyForm({
           <span className="label">Email</span>
           <p className="input bg-transparent text-muted">{email}</p>
         </div>
-        {text("phone", "Phone (with country code)", { type: "tel", placeholder: "+91 98765 43210" })}
+        {text("phone", "Phone (with country code)", { type: "tel" })}
         {text("city", "City you live in")}
         {text("currentCompany", "Current company")}
         {text("linkedinUrl", "LinkedIn profile link", { placeholder: "https://www.linkedin.com/in/…" })}
@@ -57,9 +57,12 @@ export function ApplyForm({
         {text("noticePeriod", "Notice period / when you can start", { placeholder: "e.g. 30 days" })}
       </div>
       <div>
-        <label className="label" htmlFor="coverNote">Short cover note (optional)</label>
-        <textarea className="input min-h-24" id="coverNote" name="coverNote" defaultValue={details.coverNote ?? ""} />
-        <p className="mt-1 text-xs text-muted">Used where a form asks for a cover letter or why you&apos;re interested.</p>
+        <label className="label" htmlFor="coverNote">Cover note</label>
+        <textarea className="input min-h-40" id="coverNote" name="coverNote" defaultValue={details.coverNote ?? ""} />
+        <p className="mt-1 text-xs text-muted">
+          Written from your resume. For each job, JobPilot turns it into a cover letter for that company and role,
+          and uses it where a form asks for a cover letter or why you&apos;re interested.
+        </p>
       </div>
       {state?.error && (
         <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{state.error}</p>

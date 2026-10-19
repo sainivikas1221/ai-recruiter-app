@@ -40,6 +40,14 @@ export const ExtractedProfileSchema = z.object({
   locations: z
     .array(z.string())
     .describe("Cities or countries the person is based in or has said they want to work in"),
+  currentCompany: z.string().nullable().describe("The employer of the person's current or most recent job"),
+  coverNote: z
+    .string()
+    .describe(
+      "A ready-to-send cover note in the person's own voice, 90 to 130 words, first person, plain text. " +
+        "Built only from the resume: who they are, two or three concrete strengths or results, and what they want next. " +
+        "No placeholders, no company name, no greeting or sign-off.",
+    ),
   salary: z
     .object({
       currency: z.string().describe("ISO 4217 code for where the person is based, e.g. USD, INR, EUR"),
@@ -104,6 +112,8 @@ export function mergeProfiles(first: ExtractedProfile, second: ExtractedProfile)
     jobTypes: join(first.jobTypes, second.jobTypes, 5),
     workModes: join(first.workModes, second.workModes, 3),
     locations: join(first.locations, second.locations, 5),
+    currentCompany: first.currentCompany ?? second.currentCompany ?? null,
+    coverNote: first.coverNote || second.coverNote || "",
     salary: first.salary && !first.salary.isEstimate ? first.salary : (second.salary ?? first.salary),
   };
 }

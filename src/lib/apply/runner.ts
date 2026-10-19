@@ -2,7 +2,8 @@ import "server-only";
 import { and, asc, eq, lt } from "drizzle-orm";
 import { chromium, type Browser } from "playwright-core";
 import { db, schema } from "@/db";
-import { getPreferences } from "@/lib/preferences";
+import { coverLetterFor } from "@/lib/ai/cover";
+import { getLatestDocuments, getPreferences } from "@/lib/preferences";
 import { getApplicantDetails, getResumeFile } from "./details";
 import { applicationFormUrl } from "./eligibility";
 import { fillApplication, type FillResult } from "./fill";
@@ -44,13 +45,15 @@ async function applyOne(browser: Browser, app: typeof schema.applications.$infer
   const url = job && applicationFormUrl(job);
   if (!url) return { status: "failed", note: "This job's application form isn't one JobPilot can fill.", screenshot: null };
 
-  const [details, prefs, resume, [user]] = await Promise.all([
+  const [details, prefs, resume, docs, [user]] = await Promise.all([
     getApplicantDetails(app.userId),
     getPreferences(app.userId),
     getResumeFile(app.userId),
+    getLatestDocuments(app.userId),
     db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, app.userId)),
   ]);
   if (!details) return { status: "needs_you", note: "Add your application details first.", screenshot: null };
+  const coverLetter = await coverLetterFor(job, docs.resume ?? docs.linkedin, details.coverNote);
 
   const context = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   try {
@@ -66,6 +69,7 @@ async function applyOne(browser: Browser, app: typeof schema.applications.$infer
           prefs?.salaryCurrency && (prefs.salaryTarget ?? prefs.salaryMin)
             ? { currency: prefs.salaryCurrency, amount: (prefs.salaryTarget ?? prefs.salaryMin)! }
             : null,
+        coverLetter,
       },
       resume,
       submitEnabled(),
