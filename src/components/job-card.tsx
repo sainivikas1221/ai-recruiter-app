@@ -1,6 +1,17 @@
 import { markApplied, unmarkApplied } from "@/app/actions/apply";
 import type { RankedJob } from "@/lib/jobs/rank";
-import { STATUS_LABELS, type ApplicationSummary } from "@/lib/apply/labels";
+import type { ApplicationSummary } from "@/lib/apply/labels";
+import type { ApplicationStatus } from "@/db/schema";
+
+const JOBPILOT_STATUS: Record<ApplicationStatus, string> = {
+  queued: "JobPilot is applying…",
+  filling: "JobPilot is applying…",
+  ready: "Filled in by JobPilot, not sent yet (test mode)",
+  submitted: "✓ Applied by JobPilot",
+  needs_you: "JobPilot needs you to finish this one (see Applied jobs)",
+  failed: "JobPilot couldn't apply (see Applied jobs)",
+  applied: "✓ Applied",
+};
 
 const SOURCE_LABELS: Record<string, string> = {
   greenhouse: "Greenhouse",
@@ -42,12 +53,10 @@ function age(date: Date) {
 export function JobCard({
   job,
   selectable,
-  autoApply,
   application,
 }: {
   job: RankedJob;
   selectable: boolean;
-  autoApply: boolean;
   application: ApplicationSummary | null;
 }) {
   const remote = job.workMode === "remote";
@@ -96,13 +105,11 @@ export function JobCard({
         <p className="mt-1 text-xs text-muted">
           via {SOURCE_LABELS[job.source] ?? job.source}
           {posted && ` · posted ${age(posted)}`}
-          {autoApply && !application && " · JobPilot can apply for you"}
+
         </p>
         {application && (
           <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-accent">
-            {application.appliedBy === "user"
-              ? "You marked this as applied yourself"
-              : `JobPilot: ${STATUS_LABELS[application.status]}`}
+            {application.appliedBy === "user" ? "You marked this as applied yourself" : JOBPILOT_STATUS[application.status]}
             {application.appliedBy === "user" && (
               <button formAction={unmarkApplied.bind(null, job.id)} className="font-normal text-muted hover:underline">
                 Undo
@@ -121,6 +128,12 @@ export function JobCard({
         <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-1 text-sm whitespace-nowrap">
           View job
         </a>
+        {selectable && !application && (
+          // Plain submit: opens the review page for this job plus any others that are ticked.
+          <button name="job" value={job.id} className="btn px-3 py-1 text-sm whitespace-nowrap">
+            Auto-apply
+          </button>
+        )}
         {!application && (
           <button
             formAction={markApplied.bind(null, job.id)}

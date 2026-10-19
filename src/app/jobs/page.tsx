@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { refreshJobs } from "@/app/actions/jobs";
 import { JobCard } from "@/components/job-card";
+import { SelectionBar } from "@/components/selection-bar";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { canAutoApply } from "@/lib/apply/eligibility";
@@ -112,20 +113,20 @@ async function Results({ userId, prefs, filters }: { userId: string; prefs: Pref
         </div>
       ) : (
         // One form for the list: ticked jobs go to the review page; card buttons post their own actions.
-        <form action="/apply/review" className="flex flex-col gap-3">
+        <form action="/apply/review" className="flex flex-col gap-3 pb-20">
           {filters.autoOnly && (
-            <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
-              <span>Tick the jobs you want JobPilot to apply to. You&apos;ll check everything before anything is sent.</span>
-              <button className="btn py-1.5">Review selected jobs</button>
-            </div>
+            <p className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
+              Tick the jobs you want JobPilot to apply to, then press <span className="font-semibold">Auto-apply</span>.
+              You&apos;ll check your details once before anything is sent.
+            </p>
           )}
+          <SelectionBar />
           <ul className="flex flex-col gap-3">
             {shown.slice(0, filters.limit).map((job) => (
               <JobCard
                 key={job.id}
                 job={job}
-                selectable={filters.autoOnly}
-                autoApply={canAutoApply(job)}
+                selectable={canAutoApply(job) && !applications.has(job.id)}
                 application={applications.get(job.id) ?? null}
               />
             ))}

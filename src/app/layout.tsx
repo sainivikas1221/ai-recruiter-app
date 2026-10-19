@@ -30,7 +30,7 @@ async function Nav() {
         Jobs
       </Link>
       <Link href="/applications" className="hover:underline">
-        Applications
+        Applied jobs
       </Link>
       <Link href="/preferences" className="hover:underline">
         Preferences

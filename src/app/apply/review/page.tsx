@@ -54,8 +54,8 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
 
       {chosen.length > 0 && !live && (
         <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm">
-          <span className="font-semibold">Test mode:</span> JobPilot fills in each form and shows you a picture of it,
-          but doesn&apos;t press Submit.
+          <span className="font-semibold">Test mode is on:</span> JobPilot fills in each form and shows you a picture
+          of it on Applied jobs, but doesn&apos;t press Submit yet.
         </p>
       )}
       {chosen.length > 0 && !resume && (
@@ -72,9 +72,7 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
           jobIds={chosen.map((j) => j.id)}
           submitLabel={
             chosen.length
-              ? live
-                ? `Apply to ${chosen.length} ${chosen.length === 1 ? "job" : "jobs"}`
-                : `Fill in ${chosen.length} ${chosen.length === 1 ? "application" : "applications"}`
+              ? `Auto-apply to ${chosen.length} ${chosen.length === 1 ? "job" : "jobs"}`
               : "Save details"
           }
         />
