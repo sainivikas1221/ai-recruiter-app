@@ -22,6 +22,13 @@
       "when": 1792334677186,
       "tag": "0002_silly_butterfly",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792367761627,
+      "tag": "0003_exotic_jetstream",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           action={signIn}
           initialError={typeof error === "string" ? ERRORS[error] : undefined}
         />
+        <Link href="/forgot-password" className="self-start text-sm text-accent hover:underline">
+          Forgot password?
+        </Link>
       </div>
       <p className="text-sm text-muted">
         New here?{" "}

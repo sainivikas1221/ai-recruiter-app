@@ -155,3 +155,19 @@ export const applications = pgTable(
   },
   (t) => [uniqueIndex("applications_user_job_idx").on(t.userId, t.jobId), index("applications_status_idx").on(t.status)],
 );
+
+/** One-time links for setting a new password. Only a hash of the token is stored. */
+export const passwordResets = pgTable(
+  "password_resets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("password_resets_token_hash_idx").on(t.tokenHash), index("password_resets_user_idx").on(t.userId)],
+);
