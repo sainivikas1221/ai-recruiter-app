@@ -20,12 +20,12 @@ function YesNo({ name, label, value }: { name: string; label: string; value: boo
 export function ApplyForm({
   details,
   email,
-  jobIds,
+  jobs,
   submitLabel,
 }: {
   details: ApplicantDetails;
   email: string;
-  jobIds: string[];
+  jobs: { id: string; title: string; company: string; coverLetter: string }[];
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(confirmApply, undefined);
@@ -37,9 +37,10 @@ export function ApplyForm({
   );
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      {jobIds.map((id) => (
-        <input key={id} type="hidden" name="job" value={id} />
+      {jobs.map((j) => (
+        <input key={j.id} type="hidden" name="job" value={j.id} />
       ))}
+      <input type="hidden" name="coverNote" value={details.coverNote ?? ""} />
       <div className="grid gap-4 sm:grid-cols-2">
         {text("firstName", "First name", { required: true })}
         {text("lastName", "Last name", { required: true })}
@@ -56,14 +57,29 @@ export function ApplyForm({
         <YesNo name="needsSponsorship" label="Need visa sponsorship?" value={details.needsSponsorship} />
         {text("noticePeriod", "Notice period / when you can start", { placeholder: "e.g. 30 days" })}
       </div>
-      <div>
-        <label className="label" htmlFor="coverNote">Cover note</label>
-        <textarea className="input min-h-40" id="coverNote" name="coverNote" defaultValue={details.coverNote ?? ""} />
-        <p className="mt-1 text-xs text-muted">
-          Written from your resume. For each job, JobPilot turns it into a cover letter for that company and role,
-          and uses it where a form asks for a cover letter or why you&apos;re interested.
-        </p>
-      </div>
+      {jobs.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="label">Cover letters</p>
+            <p className="text-xs text-muted">
+              Written for each job from your resume and the job description. Change anything you like.
+            </p>
+          </div>
+          {jobs.map((j, i) => (
+            <details key={j.id} open={i === 0} className="rounded-lg border border-line p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                {j.title} · {j.company}
+              </summary>
+              <textarea
+                className="input mt-2 min-h-64"
+                name={`cover:${j.id}`}
+                aria-label={`Cover letter for ${j.title} at ${j.company}`}
+                defaultValue={j.coverLetter}
+              />
+            </details>
+          ))}
+        </div>
+      )}
       {state?.error && (
         <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{state.error}</p>
       )}

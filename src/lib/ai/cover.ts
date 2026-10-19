@@ -1,21 +1,21 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { templateCoverLetter, type CoverJob, type CoverProfile } from "@/lib/apply/cover-template";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5";
 
-const SYSTEM = `You write short cover letters that job seekers send with an application.
-Write in the person's own voice, first person, plain text, 120 to 180 words, no greeting line and no sign-off.
-Use only facts from the resume and the person's own note. Never invent employers, numbers, degrees or skills.
-Connect two or three of their strongest, most relevant experiences to what this job asks for, and name the company once.`;
-
-export type CoverJob = { company: string; title: string; description: string | null };
+const SYSTEM = `You write cover letters that job seekers send with an application.
+Write in the person's own voice, first person, plain text, 150 to 220 words.
+Start with "Dear <company> hiring team," and end with "Best regards," and the person's name on the next line.
+Use only facts from the resume. Never invent employers, numbers, degrees or skills.
+Connect two or three of their strongest experiences to what this job description asks for.`;
 
 /**
- * A cover letter for one job. Written by Claude when ANTHROPIC_API_KEY is set; otherwise the
- * person's own note, pointed at this company and role.
+ * A cover letter for one job, from the person's resume and the job description. Written by
+ * Claude when ANTHROPIC_API_KEY is set, otherwise built from a template; never empty.
  */
-export async function coverLetterFor(job: CoverJob, resumeText: string | null, note: string | null): Promise<string | null> {
-  const fallback = note ? `${note.trim()}\n\nI'd be glad to bring this to ${job.company} as ${job.title}.` : null;
+export async function coverLetterFor(job: CoverJob, profile: CoverProfile, resumeText: string | null): Promise<string> {
+  const fallback = templateCoverLetter(profile, job);
   if (!process.env.ANTHROPIC_API_KEY || !resumeText) return fallback;
   try {
     const client = new Anthropic();
@@ -31,8 +31,7 @@ export async function coverLetterFor(job: CoverJob, resumeText: string | null, n
           role: "user",
           content:
             `<job company="${job.company}" title="${job.title}">\n${(job.description ?? "").slice(0, 6000)}\n</job>\n\n` +
-            `<resume>\n${resumeText.slice(0, 15000)}\n</resume>` +
-            (note ? `\n\n<their_note>\n${note}\n</their_note>` : ""),
+            `<resume name="${profile.name}">\n${resumeText.slice(0, 15000)}\n</resume>`,
         },
       ],
     });

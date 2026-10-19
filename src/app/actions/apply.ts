@@ -59,7 +59,9 @@ export async function confirmApply(_prev: ApplyState, formData: FormData): Promi
   const done = new Set(existing.filter((a) => a.status === "submitted" || a.status === "applied").map((a) => a.jobId));
 
   for (const job of jobs.filter((j) => !done.has(j.id))) {
+    const letter = String(formData.get(`cover:${job.id}`) ?? "").replace(/\r\n/g, "\n").trim().slice(0, 8000);
     const values = {
+      coverLetter: letter || null,
       userId: user.id,
       jobId: job.id,
       company: job.company,

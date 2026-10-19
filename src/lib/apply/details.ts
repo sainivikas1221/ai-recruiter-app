@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { isLinkedInExport } from "@/lib/ai/heuristic";
 import type { CurrentUser } from "@/lib/auth/user";
 import { getLatestDocuments, getLatestResume, getPreferences } from "@/lib/preferences";
+import type { CoverProfile } from "./cover-template";
 import { suggestDetails, type ApplicantDetails } from "./suggest";
 
 export type { ApplicantDetails } from "./suggest";
@@ -78,4 +79,19 @@ export async function getResumeFile(userId: string) {
   const best = withFile.find((r) => !isLinkedInExport(r.text)) ?? withFile[0];
   if (!best?.file) return null;
   return { name: best.fileName, mimeType: best.mimeType, buffer: Buffer.from(best.file) };
+}
+
+/** What cover letters say about the person: their details, preferences and resume. */
+export async function coverProfile(userId: string, details: ApplicantDetails): Promise<{ profile: CoverProfile; resumeText: string | null }> {
+  const [prefs, docs, resume] = await Promise.all([getPreferences(userId), getLatestDocuments(userId), getLatestResume(userId)]);
+  return {
+    profile: {
+      name: `${details.firstName} ${details.lastName}`.trim(),
+      role: prefs?.roles[0] ?? resume?.extracted?.roles[0] ?? null,
+      years: prefs?.yearsExperience ?? resume?.extracted?.yearsExperience ?? null,
+      currentCompany: details.currentCompany,
+      skills: prefs?.skills.length ? prefs.skills : (resume?.extracted?.skills ?? []),
+    },
+    resumeText: docs.resume ?? docs.linkedin,
+  };
 }
