@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: recruiter
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://app:app@localhost:5432/recruiter
+      SESSION_SECRET: ci-only-secret-ci-only-secret-0000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          # GitHub's Ubuntu runners come with Chrome; used by the form-filling tests.
+          AUTO_APPLY_BROWSER: /usr/bin/google-chrome
+      - run: npm run db:migrate
+      - run: npm run build
