@@ -160,3 +160,14 @@ describe("more job sources", () => {
     expect(j).toMatchObject({ workMode: "remote", title: "Visual Designer & Illustrator", location: "APAC", employmentType: "Full-Time" });
   });
 });
+
+describe("a creative director", () => {
+  it("accepts creative leadership titles and rejects other directors", () => {
+    expect(titleMatch("Creative Director", ["Creative director"])).toBe(1);
+    expect(titleMatch("Art Director", ["Creative director"])).toBeGreaterThanOrEqual(0.8);
+    expect(titleMatch("Associate Creative Director", ["Creative director"])).toBe(1);
+    expect(titleMatch("Global Director, Mid-Market Onboarding", ["Creative director"])).toBe(0);
+    expect(titleMatch("Sales Director DACH", ["Creative director"])).toBe(0);
+    expect(titleMatch("Director of Financial Risk", ["Creative director"])).toBe(0);
+  });
+});
