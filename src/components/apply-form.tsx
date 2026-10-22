@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { confirmApply } from "@/app/actions/apply";
 import type { ApplicantDetails } from "@/lib/apply/suggest";
 
@@ -81,7 +82,15 @@ export function ApplyForm({
         </div>
       )}
       {state?.error && (
-        <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{state.error}</p>
+        <p role="alert" className="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
+          {state.error}
+          {state.needsCredits && (
+            <>
+              {" "}
+              <Link href="/credits" className="font-semibold underline">Buy credits</Link>
+            </>
+          )}
+        </p>
       )}
       <button className="btn self-start" disabled={pending}>
         {pending ? "Saving…" : submitLabel}

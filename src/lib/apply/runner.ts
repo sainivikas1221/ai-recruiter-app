@@ -3,6 +3,7 @@ import { and, asc, eq, lt } from "drizzle-orm";
 import { chromium, type Browser } from "playwright-core";
 import { db, schema } from "@/db";
 import { coverLetterFor } from "@/lib/ai/cover";
+import { CREDITS_PER_APPLICATION, chargeForApplication, getCredits } from "@/lib/credits";
 import { getPreferences } from "@/lib/preferences";
 import { coverProfile, getApplicantDetails, getResumeFile } from "./details";
 import { applicationFormUrl } from "./eligibility";
@@ -80,6 +81,9 @@ async function applyOne(browser: Browser, app: typeof schema.applications.$infer
   }
 }
 
+export const OUT_OF_CREDITS =
+  "You're out of credits. Buy more credits, then press Try again. No credits were used for this job.";
+
 /** Works through queued applications one at a time. */
 async function processQueue() {
   // Applications left half-done by a restart go back in the queue.
@@ -105,6 +109,10 @@ async function processQueue() {
         .returning({ id: schema.applications.id });
       if (!claimed) continue;
 
+      if (next.creditsCharged === 0 && (await getCredits(next.userId)) < CREDITS_PER_APPLICATION) {
+        await update(next.id, { status: "needs_you", note: OUT_OF_CREDITS });
+        continue;
+      }
       browser ??= await launchBrowser();
       if (!browser) {
         await update(next.id, {
@@ -114,7 +122,10 @@ async function processQueue() {
         continue;
       }
       try {
-        await update(next.id, await applyOne(browser, next));
+        const result = await applyOne(browser, next);
+        // Credits are only taken when JobPilot filled the form all the way (sent, or ready in test mode).
+        if (result.status === "submitted" || result.status === "ready") await chargeForApplication(next);
+        await update(next.id, result);
       } catch (err) {
         console.error("Auto-apply failed", err);
         await update(next.id, { status: "failed", note: "Something went wrong while filling the form. You can apply yourself from the job page." });

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/user";
 import { signOut } from "@/app/actions/auth";
+import { getCredits } from "@/lib/credits";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ async function Nav() {
       </nav>
     );
   }
+  const credits = await getCredits(user.id);
   return (
     <nav className="flex items-center gap-4 text-sm">
       <Link href="/jobs" className="hover:underline">
@@ -37,6 +39,13 @@ async function Nav() {
       </Link>
       <Link href="/onboarding" className="hover:underline">
         Resume
+      </Link>
+      <Link
+        href="/credits"
+        className={`rounded-md px-2 py-1 font-medium ${credits < 2 ? "bg-warn-soft text-warn" : "bg-accent-soft text-accent"}`}
+        title="Credits: 2 per job JobPilot applies to"
+      >
+        {credits} credits
       </Link>
       <form action={signOut}>
         <button className="text-muted hover:underline">Sign out</button>

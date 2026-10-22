@@ -26,6 +26,8 @@ export const users = pgTable("users", {
   linkedinId: text("linkedin_id").unique(),
   // Everyone starts on a free trial; billing arrives in a later phase.
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  // Spent when JobPilot applies to a job; new accounts start with 10 free.
+  credits: integer("credits").notNull().default(10),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -152,6 +154,8 @@ export const applications = pgTable(
     coverLetter: text("cover_letter"),
     // What the filled form looked like, for the user to check.
     screenshot: bytea("screenshot"),
+    // Credits taken for this application, so trying again never charges twice.
+    creditsCharged: integer("credits_charged").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -172,4 +176,23 @@ export const passwordResets = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("password_resets_token_hash_idx").on(t.tokenHash), index("password_resets_user_idx").on(t.userId)],
+);
+
+/** Every change to a user's credits: free credits, purchases, and applications. */
+export const creditTransactions = pgTable(
+  "credit_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Positive when credits are added, negative when spent.
+    amount: integer("amount").notNull(),
+    kind: text("kind").$type<"purchase" | "application">().notNull(),
+    // What it was for, e.g. "Test purchase: 50 credits for ₹50" or "Data Analyst at Acme".
+    description: text("description").notNull(),
+    applicationId: uuid("application_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("credit_transactions_user_idx").on(t.userId, t.createdAt)],
 );
