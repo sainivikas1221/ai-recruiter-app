@@ -84,7 +84,8 @@ describe("more job sources", () => {
   const calls: { url: string; init?: FetchInit }[] = [];
   const fixtures: Record<string, unknown> = {
     jsearch: {
-      data: [
+      status: "OK",
+      data: { cursor: "c2", jobs: [
         {
           job_id: "g1", employer_name: "Pixel Studio", job_publisher: "Naukri.com", job_title: "Graphic Designer",
           job_apply_link: "https://www.naukri.com/job-listings-g1", job_description: "CorelDRAW",
@@ -92,7 +93,7 @@ describe("more job sources", () => {
           job_city: "Gurugram", job_state: "Haryana", job_country: "IN", job_min_salary: 25000,
           job_max_salary: 35000, job_salary_currency: "INR", job_salary_period: "MONTH",
         },
-      ],
+      ] },
     },
     jooble: {
       totalCount: 1,
@@ -133,6 +134,7 @@ describe("more job sources", () => {
     process.env.JSEARCH_API_KEY = "k";
     const [j] = await fetchJSearch("graphic designer", "Gurgaon", "in", fetchJson);
     const call = calls.at(-1)!;
+    expect(call.url).toContain("https://jsearch.p.rapidapi.com/search-v2?");
     expect(call.url).toContain("query=graphic+designer+jobs+in+Gurgaon");
     expect(call.url).toContain("country=in");
     expect(call.init?.headers?.["X-RapidAPI-Key"]).toBe("k");
@@ -158,5 +160,16 @@ describe("more job sources", () => {
     expect(h.postedAt?.getTime()).toBe(1760700000000);
     const [j] = await fetchJobicy("graphic designer", fetchJson);
     expect(j).toMatchObject({ workMode: "remote", title: "Visual Designer & Illustrator", location: "APAC", employmentType: "Full-Time" });
+  });
+});
+
+describe("a creative director", () => {
+  it("accepts creative leadership titles and rejects other directors", () => {
+    expect(titleMatch("Creative Director", ["Creative director"])).toBe(1);
+    expect(titleMatch("Art Director", ["Creative director"])).toBeGreaterThanOrEqual(0.8);
+    expect(titleMatch("Associate Creative Director", ["Creative director"])).toBe(1);
+    expect(titleMatch("Global Director, Mid-Market Onboarding", ["Creative director"])).toBe(0);
+    expect(titleMatch("Sales Director DACH", ["Creative director"])).toBe(0);
+    expect(titleMatch("Director of Financial Risk", ["Creative director"])).toBe(0);
   });
 });

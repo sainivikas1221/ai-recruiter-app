@@ -164,7 +164,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
           <button className="btn-ghost text-sm">Search again</button>
         </form>
       </div>
-      {canEditSearchKeys() && Object.values(searchKeyStatus()).some((set) => !set) && (
+      {canEditSearchKeys() && !searchKeyStatus().JSEARCH_API_KEY && (
         <Link href="/settings/keys" className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm hover:underline">
           <strong>Find many more jobs:</strong> add free keys for Google Jobs, Adzuna and Jooble →
         </Link>

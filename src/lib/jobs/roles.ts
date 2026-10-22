@@ -8,6 +8,10 @@ const ROLE_GROUPS: string[][] = [
     "graphic designer", "visual designer", "creative designer", "brand designer", "communication designer",
     "graphic artist", "dtp operator", "social media designer", "packaging designer", "layout artist",
   ],
+  [
+    "creative director", "art director", "design director", "creative head", "associate creative director",
+    "group creative director", "creative lead", "creative manager",
+  ],
   ["ui designer", "ux designer", "ui ux designer", "product designer", "interaction designer", "web designer"],
   ["motion graphics designer", "motion designer", "animator", "video editor", "2d animator"],
   ["illustrator", "digital illustrator", "concept artist"],

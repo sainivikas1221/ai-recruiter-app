@@ -33,6 +33,7 @@ const SYNONYMS: Record<string, string> = {
 const GENERIC = new Set([
   "design", "developer", "engineer", "manager", "executive", "analyst", "specialist", "associate",
   "assistant", "officer", "consultant", "artist", "operator", "writer", "editor", "coordinator",
+  "director", "head", "vp", "president", "intern", "trainee",
 ]);
 const GENERIC_WEIGHT = 0.35;
 /** A title that is another name for the same role counts a little less than the role itself. */
