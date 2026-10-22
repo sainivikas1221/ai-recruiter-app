@@ -26,6 +26,8 @@ describe("preferencesFromProfile", () => {
     const prefs = preferencesFromProfile({
       fullName: null,
       headline: "x",
+      currentCompany: null,
+      coverNote: "",
       roles: ["A", "B", "C", "D", "E", "F"],
       skills: [],
       yearsExperience: 4.6,

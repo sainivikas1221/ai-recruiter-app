@@ -2,8 +2,9 @@ import "server-only";
 import { and, asc, eq, lt } from "drizzle-orm";
 import { chromium, type Browser } from "playwright-core";
 import { db, schema } from "@/db";
+import { coverLetterFor } from "@/lib/ai/cover";
 import { getPreferences } from "@/lib/preferences";
-import { getApplicantDetails, getResumeFile } from "./details";
+import { coverProfile, getApplicantDetails, getResumeFile } from "./details";
 import { applicationFormUrl } from "./eligibility";
 import { fillApplication, type FillResult } from "./fill";
 
@@ -51,6 +52,9 @@ async function applyOne(browser: Browser, app: typeof schema.applications.$infer
     db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, app.userId)),
   ]);
   if (!details) return { status: "needs_you", note: "Add your application details first.", screenshot: null };
+  // The letter approved on the review page; written now for applications queued without one.
+  const coverLetter =
+    app.coverLetter ?? (await coverProfile(app.userId, details).then((c) => coverLetterFor(job, c.profile, c.resumeText)));
 
   const context = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   try {
@@ -66,6 +70,7 @@ async function applyOne(browser: Browser, app: typeof schema.applications.$infer
           prefs?.salaryCurrency && (prefs.salaryTarget ?? prefs.salaryMin)
             ? { currency: prefs.salaryCurrency, amount: (prefs.salaryTarget ?? prefs.salaryMin)! }
             : null,
+        coverLetter,
       },
       resume,
       submitEnabled(),

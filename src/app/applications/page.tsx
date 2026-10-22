@@ -52,7 +52,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/app
       {working && <AutoRefresh />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Your applications</h1>
+          <h1 className="text-2xl font-bold">Applied jobs</h1>
           <p className="text-sm text-muted">Every job you applied to, by JobPilot or by yourself.</p>
         </div>
         <div className="flex gap-2 text-sm">
@@ -76,7 +76,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/app
           <p>No applications yet.</p>
           <p className="text-sm">
             On <Link href="/jobs?auto=1" className="text-accent hover:underline">your jobs</Link>, tick the jobs you
-            want JobPilot to apply to, or press &ldquo;I applied&rdquo; on jobs you applied to yourself.
+            want JobPilot to apply to, or press &ldquo;Mark as applied by me&rdquo; on jobs you applied to yourself.
           </p>
         </div>
       ) : (

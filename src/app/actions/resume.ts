@@ -6,7 +6,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/lib/auth/user";
 import { extractProfile } from "@/lib/ai/extract";
-import { isLinkedInExport } from "@/lib/ai/heuristic";
+import { cleanName, isLinkedInExport } from "@/lib/ai/heuristic";
 import { preferencesFromProfile } from "@/lib/profile";
 import { getLatestDocuments, savePreferences } from "@/lib/preferences";
 import { extractResumeText, ResumeParseError, resumeKind } from "@/lib/resume/parse";
@@ -54,7 +54,7 @@ export async function uploadResume(_prev: UploadState, formData: FormData): Prom
   if (extraction.profile.fullName) {
     await db
       .update(schema.users)
-      .set({ name: extraction.profile.fullName })
+      .set({ name: cleanName(extraction.profile.fullName) })
       .where(and(eq(schema.users.id, user.id), isNull(schema.users.name)));
   }
   revalidatePath("/", "layout");

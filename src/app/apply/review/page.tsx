@@ -2,7 +2,8 @@ import Link from "next/link";
 import { inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { ApplyForm } from "@/components/apply-form";
-import { detailsOrSuggestion, getResumeFile } from "@/lib/apply/details";
+import { coverLetterFor } from "@/lib/ai/cover";
+import { coverProfile, detailsOrSuggestion, getResumeFile } from "@/lib/apply/details";
 import { canAutoApply } from "@/lib/apply/eligibility";
 import { submitEnabled } from "@/lib/apply/runner";
 import { requireUser } from "@/lib/auth/user";
@@ -18,6 +19,9 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
   ]);
   const chosen = jobs.filter(canAutoApply);
   const live = submitEnabled();
+  // A cover letter for each job, from the resume and that job's description, ready to edit.
+  const { profile, resumeText } = await coverProfile(user.id, details);
+  const letters = await Promise.all(chosen.map((j) => coverLetterFor(j, profile, resumeText)));
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -26,7 +30,7 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
         <p className="text-muted">
           {chosen.length
             ? "These details and your resume go into each application form. Fix anything that isn't right."
-            : "JobPilot uses these details and your resume to fill in application forms for you."}
+            : "JobPilot uses these details and your resume to fill in application forms, and writes a cover letter for each job from your resume and the job description."}
         </p>
       </div>
 
@@ -54,8 +58,8 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
 
       {chosen.length > 0 && !live && (
         <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm">
-          <span className="font-semibold">Test mode:</span> JobPilot fills in each form and shows you a picture of it,
-          but doesn&apos;t press Submit.
+          <span className="font-semibold">Test mode is on:</span> JobPilot fills in each form and shows you a picture
+          of it on Applied jobs, but doesn&apos;t press Submit yet.
         </p>
       )}
       {chosen.length > 0 && !resume && (
@@ -69,12 +73,10 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
         <ApplyForm
           details={details}
           email={user.email}
-          jobIds={chosen.map((j) => j.id)}
+          jobs={chosen.map((j, i) => ({ id: j.id, title: j.title, company: j.company, coverLetter: letters[i] }))}
           submitLabel={
             chosen.length
-              ? live
-                ? `Apply to ${chosen.length} ${chosen.length === 1 ? "job" : "jobs"}`
-                : `Fill in ${chosen.length} ${chosen.length === 1 ? "application" : "applications"}`
+              ? `Auto-apply to ${chosen.length} ${chosen.length === 1 ? "job" : "jobs"}`
               : "Save details"
           }
         />

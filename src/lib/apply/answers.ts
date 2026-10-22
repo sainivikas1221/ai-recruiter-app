@@ -5,6 +5,8 @@ export type AnswerContext = {
   email: string;
   yearsExperience: number | null;
   salary: { currency: string; amount: number } | null;
+  /** Written for this job; falls back to the person's own note. */
+  coverLetter?: string | null;
 };
 
 /** A form field as the filler sees it. */
@@ -51,7 +53,7 @@ export function answerFor(field: FieldInfo, ctx: AnswerContext): Answer {
     return text(yesNo(d.authorizedToWork));
   if (/notice period|earliest start|when can you start|start date|availability/.test(l)) return text(d.noticePeriod);
   if (/cover letter|why (do you want|are you interested)|additional information|anything else/.test(l))
-    return field.kind === "textarea" ? text(d.coverNote) : null;
+    return field.kind === "textarea" ? text(ctx.coverLetter ?? d.coverNote) : null;
   if (/salary|compensation|pay expectation|expected ctc|desired pay/.test(l))
     return ctx.salary ? { value: `${ctx.salary.amount} ${ctx.salary.currency} per year` } : null;
   if (/years of (professional )?experience|how many years/.test(l))

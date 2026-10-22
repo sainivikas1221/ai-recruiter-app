@@ -27,11 +27,14 @@ export async function extractResumeText(file: File): Promise<string> {
   try {
     if (kind === "pdf") {
       const { extractText } = await import("unpdf");
-      text = (await extractText(bytes, { mergePages: true })).text;
+      text = (await extractText(bytes.slice(), { mergePages: true })).text;
     } else {
       const mammoth = await import("mammoth");
       text = (await mammoth.extractRawText({ buffer: Buffer.from(bytes) })).value;
     }
+    // Resumes often show "LinkedIn" as a word whose link is only in the file, not the text.
+    const links = await linksIn(bytes, kind);
+    if (links.length) text += `\n\nLinks:\n${links.join("\n")}`;
   } catch {
     throw new ResumeParseError("We couldn't read that file. Try saving it again as a PDF.");
   }
@@ -43,4 +46,22 @@ export async function extractResumeText(file: File): Promise<string> {
     );
   }
   return text;
+}
+
+/** Web links embedded in a resume file (mailto and phone links included). */
+export async function linksIn(bytes: Uint8Array, kind: "pdf" | "docx"): Promise<string[]> {
+  try {
+    let links: string[];
+    if (kind === "pdf") {
+      const { extractLinks } = await import("unpdf");
+      links = (await extractLinks(bytes.slice())).links;
+    } else {
+      const mammoth = await import("mammoth");
+      const html = (await mammoth.convertToHtml({ buffer: Buffer.from(bytes) })).value;
+      links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+    }
+    return [...new Set(links.filter((l) => /^(https?:|mailto:|tel:)/i.test(l)))].slice(0, 20);
+  } catch {
+    return [];
+  }
 }

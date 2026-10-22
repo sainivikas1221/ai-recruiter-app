@@ -148,6 +148,8 @@ export const applications = pgTable(
     status: text("status").$type<ApplicationStatus>().notNull(),
     // Plain-language explanation of the status, e.g. which question needs an answer.
     note: text("note"),
+    // The cover letter written for this job, as the person approved it.
+    coverLetter: text("cover_letter"),
     // What the filled form looked like, for the user to check.
     screenshot: bytea("screenshot"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

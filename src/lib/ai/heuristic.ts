@@ -29,6 +29,40 @@ function mentions(text: string, term: string) {
   return new RegExp(`(^|[^A-Za-z0-9])${escapeRegExp(term)}(?![A-Za-z0-9])`, "i").test(text);
 }
 
+/** "Vikas Saini, CSM®" → "Vikas Saini": drops credentials and marks people add to their name. */
+export function cleanName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const words = name
+    .replace(/[®™©]/g, "")
+    .split(",")[0]
+    .split(/\s+/)
+    .filter(Boolean);
+  while (words.length > 1 && /^(?:[A-Z]{2,6}|Ph\.?D\.?|MBA|CSM|PMP|CSPO|SAFe|CFA|CPA|Jr\.?|Sr\.?)$/.test(words[words.length - 1])) words.pop();
+  return words.join(" ") || null;
+}
+
+function joinList(xs: string[]) {
+  return xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}
+
+/** The employer of the current job: "Senior Analyst, Acme (2021–present)" → "Acme". */
+function currentCompany(text: string, linkedinLines: string[] | null): string | null {
+  if (linkedinLines) {
+    const at = linkedinLines.findIndex((l) => l.toLowerCase() === "experience");
+    const next = at >= 0 ? linkedinLines[at + 1] : undefined;
+    return next && !LINKEDIN_SECTIONS.has(next.toLowerCase()) ? next : null;
+  }
+  const line = text.split("\n").find((l) => /\b(present|current|till date|to date|now)\b/i.test(l) && /\d{4}/.test(l));
+  if (!line) return null;
+  const parts = line
+    .replace(/\(.*$/, "")
+    .split(/\s*[,|–—]\s*|\s+-\s+|\s+at\s+|\s+@\s+/)
+    .map((p) => p.trim())
+    .filter((p) => p && !/\d/.test(p) && !/\b(present|current)\b/i.test(p));
+  const company = parts.find((p) => !TITLES.some((t) => mentions(p, t)) && !/\b(engineer|manager|analyst|developer|designer|lead|director|consultant|intern|head)\b/i.test(p));
+  return company && company.split(/\s+/).length <= 6 ? company : null;
+}
+
 /** What the app already knows about the person, e.g. their name from LinkedIn sign-in. */
 export type ProfileHints = { name?: string | null };
 
@@ -54,8 +88,8 @@ function linkedinProfile(text: string, hints: ProfileHints) {
   for (let i = skillsAt + 1; i < lines.length && !LINKEDIN_SECTIONS.has(lower[i]); i++) skills.push(lines[i]);
 
   // The name is followed by the headline and then the location.
-  const name = hints.name?.trim().toLowerCase();
-  const nameAt = name ? lower.indexOf(name) : -1;
+  const name = cleanName(hints.name)?.toLowerCase();
+  const nameAt = name ? lower.findIndex((l) => l === name || cleanName(l)?.toLowerCase() === name) : -1;
   const headline = nameAt >= 0 && !LINKEDIN_SECTIONS.has(lower[nameAt + 1] ?? "summary") ? lines[nameAt + 1] : null;
   const place = nameAt >= 0 ? lines[nameAt + 2] : undefined;
   const location = place && place.includes(",") && !LINKEDIN_SECTIONS.has(place.toLowerCase()) ? place : null;
@@ -93,7 +127,14 @@ export function heuristicProfile(text: string, hints: ProfileHints = {}): Extrac
     const seen = new Set<string>();
     return xs.filter((x): x is string => !!x && !seen.has(x.toLowerCase()) && !!seen.add(x.toLowerCase()));
   };
-  const skills = unique([...(linkedin?.skills ?? []), ...SKILLS.filter((s) => mentions(text, s))]);
+  // A "Skills: A, B, C" line lists them in the person's own words.
+  const listed = text
+    .split("\n")
+    .filter((l) => /^\s*(key |technical |core )?skills\s*[:|-]/i.test(l))
+    .flatMap((l) => l.replace(/^[^:|-]*[:|-]/, "").split(/[,;|•·]/))
+    .map((x) => x.trim())
+    .filter((x) => x.length > 1 && x.length < 40);
+  const skills = unique([...(linkedin?.skills ?? []), ...listed, ...SKILLS.filter((s) => mentions(text, s))]);
   const headline = linkedin?.headline ?? null;
   const titles = unique([
     ...(headline ? TITLES.filter((t) => mentions(headline, t)) : []),
@@ -111,9 +152,22 @@ export function heuristicProfile(text: string, hints: ProfileHints = {}): Extrac
 
   const firstLine = text.split("\n").map((l) => l.trim()).find(Boolean) ?? "";
   const looksLikeName = /^[A-Za-z][A-Za-z .'-]{2,40}$/.test(firstLine) && firstLine.split(" ").length <= 4;
+  const lines = linkedin ? text.split("\n").map((l) => l.trim()).filter(Boolean) : null;
+  const company = currentCompany(text, lines);
+  const role = titles[0] ?? null;
+  const yrs = Number.isFinite(yearsExperience) ? yearsExperience : null;
+
+  const coverNote = [
+    `I'm ${role ? `a ${role}` : "a professional"}${yrs ? ` with ${yrs} years of experience` : ""}${company ? `, currently at ${company}` : ""}.`,
+    skills.length ? `My work centres on ${joinList(skills.slice(0, 4))}.` : "",
+    `I'm looking for my next ${role ? `${role} ` : ""}role, where I can bring that experience to a team that values ownership and clear results.`,
+    "I'd welcome the chance to talk about how I can help.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return {
-    fullName: hints.name ?? (looksLikeName && !linkedin ? firstLine : null),
+    fullName: cleanName(hints.name) ?? (looksLikeName && !linkedin ? firstLine : null),
     headline: headline ?? titles[0] ?? "Professional",
     roles: titles.slice(0, 5),
     skills: skills.slice(0, 20),
@@ -122,5 +176,7 @@ export function heuristicProfile(text: string, hints: ProfileHints = {}): Extrac
     workModes,
     locations: city ? [city] : [],
     salary: statedSalary(text, city),
+    currentCompany: company,
+    coverNote,
   };
 }

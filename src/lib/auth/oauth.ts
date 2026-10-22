@@ -1,6 +1,7 @@
 import "server-only";
 import { eq, or } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { cleanName } from "@/lib/ai/heuristic";
 import { appUrl } from "./app-url";
 import { getSession } from "./session";
 import { trialEnd } from "./user";
@@ -42,7 +43,7 @@ export async function finishOAuthSignIn(provider: OAuthProvider, claims: OAuthCl
   } else {
     const [created] = await db
       .insert(schema.users)
-      .values({ email, name: claims.name ?? null, [ID_FIELD[provider]]: claims.sub, trialEndsAt: trialEnd() })
+      .values({ email, name: cleanName(claims.name), [ID_FIELD[provider]]: claims.sub, trialEndsAt: trialEnd() })
       .returning({ id: schema.users.id });
     userId = created.id;
     isNew = true;
