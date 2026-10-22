@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { refreshJobs } from "@/app/actions/jobs";
 import { JobCard } from "@/components/job-card";
 import { SearchElsewhere } from "@/components/search-elsewhere";
+import { canEditSearchKeys, searchKeyStatus } from "@/lib/search-keys";
 import { SelectionBar } from "@/components/selection-bar";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -163,6 +164,11 @@ export default async function JobsPage({ searchParams }: PageProps<"/jobs">) {
           <button className="btn-ghost text-sm">Search again</button>
         </form>
       </div>
+      {canEditSearchKeys() && Object.values(searchKeyStatus()).some((set) => !set) && (
+        <Link href="/settings/keys" className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm hover:underline">
+          <strong>Find many more jobs:</strong> add free keys for Google Jobs, Adzuna and Jooble →
+        </Link>
+      )}
       <Suspense
         key={JSON.stringify([filters, prefs])}
         fallback={
