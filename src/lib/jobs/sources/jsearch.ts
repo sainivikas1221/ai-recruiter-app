@@ -42,17 +42,19 @@ export async function fetchJSearch(
 ): Promise<NormalizedJob[]> {
   const params = new URLSearchParams({
     query: where ? `${search} jobs in ${where}` : `${search} jobs`,
-    page: "1",
+    // 10 jobs per page, each page one request of the free monthly allowance.
     num_pages: "2",
     country,
     date_posted: "month",
   });
   const host = process.env.JSEARCH_API_HOST ?? "jsearch.p.rapidapi.com";
-  const data = (await fetchJson(`https://${host}/search?${params}`, {
+  // JSearch v5 replaced /search with /search-v2, which nests the jobs under data.jobs.
+  const res = (await fetchJson(`https://${host}/search-v2?${params}`, {
     headers: { "X-RapidAPI-Key": process.env.JSEARCH_API_KEY ?? "", "X-RapidAPI-Host": host },
-  })) as { data?: JSearchJob[] };
+  })) as { data?: JSearchJob[] | { jobs?: JSearchJob[] } };
+  const jobs = Array.isArray(res.data) ? res.data : (res.data?.jobs ?? []);
 
-  return (data.data ?? [])
+  return jobs
     .filter((j) => j.job_id && j.job_title && (j.job_apply_link || j.job_google_link))
     .map((j) => {
       const location =

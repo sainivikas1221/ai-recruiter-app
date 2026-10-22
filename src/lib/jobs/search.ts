@@ -58,6 +58,9 @@ function feedsFor(prefs: Preferences): Feed[] {
   const country = (process.env.ADZUNA_COUNTRY ?? userCountry ?? "us").toLowerCase();
   const city = places.cities.size ? prefs.locations.find((l) => !/^(remote|anywhere)$/i.test(l.trim())) ?? null : null;
   const where = city ?? (userCountryName ? countryLabel(userCountryName) : null);
+  // Jooble finds nothing for many Indian city names ("Gurgaon", "Gurugram"), so it searches the whole
+  // country and ranking keeps the jobs in the user's city or open to them.
+  const joobleWhere = (userCountryName ? countryLabel(userCountryName) : null) ?? city;
 
   // The user's roles plus other common titles for the same work ("Visual Designer" for "Graphic Designer").
   const terms = searchTerms(prefs.roles);
@@ -73,8 +76,8 @@ function feedsFor(prefs: Preferences): Feed[] {
     }
     if (joobleEnabled()) {
       feeds.push({
-        key: `jooble:${q}:${where ?? ""}`.toLowerCase(),
-        load: () => fetchJooble(q, where, fetchJson),
+        key: `jooble:${q}:${joobleWhere ?? ""}`.toLowerCase(),
+        load: () => fetchJooble(q, joobleWhere, fetchJson),
       });
     }
   }
