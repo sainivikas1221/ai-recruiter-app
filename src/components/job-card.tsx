@@ -20,6 +20,17 @@ const SOURCE_LABELS: Record<string, string> = {
   remotive: "Remotive",
   arbeitnow: "Arbeitnow",
   adzuna: "Adzuna",
+  jsearch: "Google Jobs",
+  jooble: "Jooble",
+  himalayas: "Himalayas",
+  jobicy: "Jobicy",
+};
+
+// Sources whose terms ask for a visible link back to them.
+const SOURCE_HOMES: Record<string, string> = {
+  remotive: "https://remotive.com",
+  himalayas: "https://himalayas.app",
+  jobicy: "https://jobicy.com",
 };
 
 function salary(job: RankedJob) {
@@ -103,7 +114,14 @@ export function JobCard({
           </ul>
         )}
         <p className="mt-1 text-xs text-muted">
-          via {SOURCE_LABELS[job.source] ?? job.source}
+          via{" "}
+          {SOURCE_HOMES[job.source] ? (
+            <a href={SOURCE_HOMES[job.source]} target="_blank" rel="noopener noreferrer" className="hover:underline">
+              {SOURCE_LABELS[job.source]}
+            </a>
+          ) : (
+            (SOURCE_LABELS[job.source] ?? job.source)
+          )}
           {posted && ` · posted ${age(posted)}`}
 
         </p>

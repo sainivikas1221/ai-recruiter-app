@@ -1,6 +1,7 @@
 import type { Preferences } from "@/lib/profile";
 import type { NormalizedJob } from "./types";
 import { inUserPlace, remoteOpenTo, userPlaces, type UserPlaces } from "./geo";
+import { relatedRoles } from "./roles";
 
 export type RankableJob = Omit<NormalizedJob, "postedAt"> & {
   id: string;
@@ -20,10 +21,22 @@ const STOPWORDS = new Set([
 const SYNONYMS: Record<string, string> = {
   dev: "developer", developers: "developer", engineers: "engineer", eng: "engineer",
   swe: "engineer", programmer: "developer", ml: "machine-learning", ai: "machine-learning",
-  frontend: "front-end", backend: "back-end", fullstack: "full-stack", ux: "design",
-  ui: "design", designer: "design", analytics: "analyst", analysis: "analyst", pm: "product",
+  frontend: "front-end", backend: "back-end", fullstack: "full-stack", ux: "ui-ux",
+  ui: "ui-ux", designer: "design", analytics: "analyst", analysis: "analyst", pm: "product",
   sre: "reliability", devops: "devops", bi: "business-intelligence", qa: "quality",
+  graphics: "graphic", designers: "design", designing: "design", artists: "artist",
+  editors: "editor", executives: "executive", writers: "writer", managers: "manager",
 };
+
+// Words that say what level or kind of job it is but not what the work is. A "Graphic Designer"
+// search should not accept an "Interior Designer", so these count for less than the other words.
+const GENERIC = new Set([
+  "design", "developer", "engineer", "manager", "executive", "analyst", "specialist", "associate",
+  "assistant", "officer", "consultant", "artist", "operator", "writer", "editor", "coordinator",
+]);
+const GENERIC_WEIGHT = 0.35;
+/** A title that is another name for the same role counts a little less than the role itself. */
+const RELATED_FACTOR = 0.85;
 
 export function tokens(text: string): string[] {
   return text
@@ -38,15 +51,38 @@ export function tokens(text: string): string[] {
     .map((t) => SYNONYMS[t] ?? t);
 }
 
-/** 0..1: how well a job title matches the best of the user's target roles. */
+function roleMatch(titleTokens: Set<string>, role: string): number {
+  const roleTokens = [...new Set(tokens(role))];
+  let total = 0;
+  let hit = 0;
+  let specific = false;
+  let specificHit = false;
+  for (const t of roleTokens) {
+    const generic = GENERIC.has(t);
+    const w = generic ? GENERIC_WEIGHT : 1;
+    total += w;
+    if (!generic) specific = true;
+    if (titleTokens.has(t)) {
+      hit += w;
+      if (!generic) specificHit = true;
+    }
+  }
+  // Sharing only "Designer" or "Executive" says nothing about the work itself.
+  if (specific && !specificHit) return 0;
+  return total ? hit / total : 0;
+}
+
+/** 0..1: how well a job title matches the best of the user's target roles (or other names for them). */
 export function titleMatch(title: string, roles: string[]): number {
   const titleTokens = new Set(tokens(title));
   let best = 0;
   for (const role of roles) {
-    const roleTokens = [...new Set(tokens(role))];
-    if (!roleTokens.length) continue;
-    const hits = roleTokens.filter((t) => titleTokens.has(t)).length;
-    best = Math.max(best, hits / roleTokens.length);
+    best = Math.max(best, roleMatch(titleTokens, role));
+    if (best >= 1) break;
+    // Another name only counts when the title has all of it: "Brand Designer", not "Brand Manager".
+    if (relatedRoles(role).some((other) => roleMatch(titleTokens, other) >= 1)) {
+      best = Math.max(best, RELATED_FACTOR);
+    }
   }
   return best;
 }

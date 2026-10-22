@@ -9,17 +9,26 @@ Applying (one-click and auto-apply with approval) comes in Phase 2.
 
 ## Where jobs come from
 
-Only sources that publish jobs for other apps to read. Sites whose terms ban automation (LinkedIn,
-Indeed, Naukri, Glassdoor) are deliberately not used.
+Only sources that publish jobs for other apps to read. JobPilot never reads or applies on sites whose
+terms ban automation (LinkedIn, Indeed, Naukri, Shine, Glassdoor). Instead the jobs page has
+"Search on more job sites" links that open those sites' own search, filled in with the user's role and
+city, so they can apply there (`src/lib/jobs/elsewhere.ts`).
 
 | Source | What it is | Key needed |
 | --- | --- | --- |
 | Greenhouse, Lever, Ashby | Public job board APIs of company career pages (list in `src/lib/jobs/boards.ts`) | No |
 | Remotive | Remote jobs API | No |
+| Himalayas | Remote jobs API | No |
+| Jobicy | Remote jobs API | No |
 | Arbeitnow | Job board API, mostly Europe | No |
-| Adzuna | Aggregator API in ~20 countries | Yes (free) |
+| Adzuna | Aggregator API in ~20 countries, India included | Yes (free) |
+| Jooble | Aggregator API in ~70 countries, India included | Yes (free) |
+| JSearch | Google for Jobs results: what Google finds on Naukri, LinkedIn, Indeed, company sites | Yes (free plan) |
 
-Each feed is cached for 6 hours in Postgres. A feed that fails is skipped and retried on the next search.
+Each search uses the user's roles plus other common titles for the same work, e.g. "Visual Designer"
+and "Creative Designer" for "Graphic Designer" (`src/lib/jobs/roles.ts`).
+
+Each feed is cached for 6 hours in Postgres (JSearch for 24 hours, to stay in its free allowance). A feed that fails is skipped and retried on the next search.
 
 ## Ranking
 
@@ -34,7 +43,9 @@ and the same role listed on two sources is shown once.
 It installs Node.js if needed (Windows), downloads dependencies and builds the app the first time,
 then opens it in your browser. Nothing else to set up: without `DATABASE_URL` the app runs Postgres
 inside itself ([PGlite](https://pglite.dev)) and keeps the data in `~/.jobpilot`, so a fresh download
-keeps your accounts. The first start asks once for an optional Anthropic API key.
+keeps your accounts. The first start asks once for an optional Anthropic API key. Job search keys
+(`ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `JSEARCH_API_KEY`) go in `~/.jobpilot/keys.env`,
+one `NAME=value` per line, and are kept across new downloads.
 
 **As a developer:**
 
