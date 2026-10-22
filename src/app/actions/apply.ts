@@ -10,8 +10,9 @@ import { requireUser } from "@/lib/auth/user";
 import { saveApplicantDetails } from "@/lib/apply/details";
 import { canAutoApply } from "@/lib/apply/eligibility";
 import { kickQueue } from "@/lib/apply/runner";
+import { CREDITS_PER_APPLICATION, applicationsFor, getCredits, spendableCredits } from "@/lib/credits";
 
-export type ApplyState = { error?: string } | undefined;
+export type ApplyState = { error?: string; needsCredits?: boolean } | undefined;
 
 const optional = z
   .string()
@@ -53,12 +54,37 @@ export async function confirmApply(_prev: ApplyState, formData: FormData): Promi
   }
   const jobs = (await db.select().from(schema.jobs).where(inArray(schema.jobs.id, jobIds))).filter(canAutoApply);
   const existing = await db
-    .select({ jobId: schema.applications.jobId, status: schema.applications.status })
+    .select({
+      jobId: schema.applications.jobId,
+      status: schema.applications.status,
+      creditsCharged: schema.applications.creditsCharged,
+    })
     .from(schema.applications)
     .where(and(eq(schema.applications.userId, user.id), inArray(schema.applications.jobId, jobIds)));
   const done = new Set(existing.filter((a) => a.status === "submitted" || a.status === "applied").map((a) => a.jobId));
+  const toQueue = jobs.filter((j) => !done.has(j.id));
 
-  for (const job of jobs.filter((j) => !done.has(j.id))) {
+  // Jobs already paid for, or already waiting in the queue, need no new credits.
+  const covered = new Set(
+    existing.filter((a) => a.creditsCharged > 0 || a.status === "queued" || a.status === "filling").map((a) => a.jobId),
+  );
+  const needed = toQueue.filter((j) => !covered.has(j.id)).length * CREDITS_PER_APPLICATION;
+  const available = await spendableCredits(user.id);
+  if (needed > available) {
+    const balance = await getCredits(user.id);
+    const canDo = applicationsFor(available);
+    return {
+      needsCredits: true,
+      error:
+        `Applying to ${toQueue.length} ${toQueue.length === 1 ? "job" : "jobs"} needs ${needed} credits ` +
+        `(${CREDITS_PER_APPLICATION} per job), but you have ${balance}` +
+        (available < balance ? ` and ${balance - available} are set aside for jobs already in the queue` : "") +
+        `. Buy more credits` +
+        (canDo > 0 ? `, or pick ${canDo === 1 ? "just 1 job" : `${canDo} jobs or fewer`}.` : " to continue."),
+    };
+  }
+
+  for (const job of toQueue) {
     const letter = String(formData.get(`cover:${job.id}`) ?? "").replace(/\r\n/g, "\n").trim().slice(0, 8000);
     const values = {
       coverLetter: letter || null,
@@ -172,6 +198,10 @@ export async function retryApplication(formData: FormData) {
   const user = await requireUser();
   const app = await ownApplication(user.id, String(formData.get("id") ?? ""));
   if (!app || app.appliedBy !== "jobpilot") return;
+  // Without enough credits, the job stays as it is and the page points to Buy credits.
+  if (app.creditsCharged === 0 && (await spendableCredits(user.id)) < CREDITS_PER_APPLICATION) {
+    redirect("/credits?needed=1");
+  }
   await db
     .update(schema.applications)
     .set({ status: "queued", note: null, updatedAt: new Date() })

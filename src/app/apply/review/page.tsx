@@ -7,18 +7,22 @@ import { coverProfile, detailsOrSuggestion, getResumeFile } from "@/lib/apply/de
 import { canAutoApply } from "@/lib/apply/eligibility";
 import { submitEnabled } from "@/lib/apply/runner";
 import { requireUser } from "@/lib/auth/user";
+import { CREDITS_PER_APPLICATION, applicationsFor, getCredits, spendableCredits } from "@/lib/credits";
 
 export default async function ReviewPage({ searchParams }: PageProps<"/apply/review">) {
   const user = await requireUser();
   const { job } = await searchParams;
   const ids = [...new Set([job ?? []].flat())].slice(0, 50);
-  const [jobs, { details }, resume] = await Promise.all([
+  const [jobs, { details }, resume, balance, available] = await Promise.all([
     ids.length ? db.select().from(schema.jobs).where(inArray(schema.jobs.id, ids)) : [],
     detailsOrSuggestion(user),
     getResumeFile(user.id),
+    getCredits(user.id),
+    spendableCredits(user.id),
   ]);
   const chosen = jobs.filter(canAutoApply);
   const live = submitEnabled();
+  const cost = chosen.length * CREDITS_PER_APPLICATION;
   // A cover letter for each job, from the resume and that job's description, ready to edit.
   const { profile, resumeText } = await coverProfile(user.id, details);
   const letters = await Promise.all(chosen.map((j) => coverLetterFor(j, profile, resumeText)));
@@ -53,6 +57,31 @@ export default async function ReviewPage({ searchParams }: PageProps<"/apply/rev
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {chosen.length > 0 && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${cost > available ? "bg-warn-soft text-warn" : "bg-accent-soft"}`}
+        >
+          <p>
+            {cost > available ? (
+              <>
+                <span className="font-semibold">Not enough credits.</span> This needs {cost} credits ({CREDITS_PER_APPLICATION}{" "}
+                per job) and you have {balance}
+                {available < balance && <>, with {balance - available} set aside for jobs already in the queue</>}.
+                {applicationsFor(available) > 0 && <> That&apos;s enough for {applicationsFor(available)} of these jobs.</>}
+              </>
+            ) : (
+              <>
+                This uses up to <span className="font-semibold">{cost} credits</span> ({CREDITS_PER_APPLICATION} per job). You
+                have {balance}. Credits are only taken for jobs JobPilot actually applies to.
+              </>
+            )}
+          </p>
+          <Link href="/credits" className={cost > available ? "btn py-1.5" : "text-accent underline"}>
+            Buy credits
+          </Link>
         </div>
       )}
 
