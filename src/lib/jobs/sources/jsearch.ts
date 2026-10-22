@@ -51,6 +51,8 @@ export async function fetchJSearch(
   // JSearch v5 replaced /search with /search-v2, which nests the jobs under data.jobs.
   const res = (await fetchJson(`https://${host}/search-v2?${params}`, {
     headers: { "X-RapidAPI-Key": process.env.JSEARCH_API_KEY ?? "", "X-RapidAPI-Host": host },
+    // JSearch averages ~10 seconds and often takes longer when other sources are searched at once.
+    timeoutMs: 45000,
   })) as { data?: JSearchJob[] | { jobs?: JSearchJob[] } };
   const jobs = Array.isArray(res.data) ? res.data : (res.data?.jobs ?? []);
 

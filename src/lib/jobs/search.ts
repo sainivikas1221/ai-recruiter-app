@@ -30,7 +30,7 @@ const fetchJson: FetchJson = async (url, init) => {
     method: init?.method ?? "GET",
     body: init?.body,
     headers: { Accept: "application/json", "User-Agent": "JobPilot/0.1 (job search app)", ...init?.headers },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(init?.timeoutMs ?? 15000),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();

@@ -18,5 +18,11 @@ export type NormalizedJob = {
   applyViaAts: boolean;
 };
 
-export type FetchInit = { method?: "GET" | "POST"; headers?: Record<string, string>; body?: string };
+export type FetchInit = {
+  method?: "GET" | "POST";
+  headers?: Record<string, string>;
+  body?: string;
+  /** Slow sources can wait longer than the default 15 seconds. */
+  timeoutMs?: number;
+};
 export type FetchJson = (url: string, init?: FetchInit) => Promise<unknown>;
